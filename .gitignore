@@ -1,0 +1,75 @@
+# ---- Build output ----
+bin/
+obj/
+out/
+publish/
+*.binlog
+
+# ---- IDEs / editors ----
+.vs/
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ---- OS cruft ----
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- Test / coverage ----
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+*.trx
+.coverlet/
+
+# ---- .NET user-specific ----
+*.user
+*.suo
+*.userprefs
+*.rsuser
+.vshistory/
+
+# ---- NuGet ----
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+project.lock.json
+
+# ---- Local tool / cache dirs ----
+.dotnet/
+.local/
+
+# ---- Playwright ----
+.playwright/
+playwright-report/
+playwright/.cache/
+
+# ---- Secrets & local config (never commit) ----
+*.env
+.env
+.env.*
+!.env.example
+secrets.json
+appsettings.*.Local.json
+appsettings.Local.json
+*.pfx
+*.p12
+*.key
+*.pem
+*.crt
+*-cookie
+pulse-cookie
+
+# ---- Logs / runtime ----
+*.log
+logs/
+
+# ---- Misc temp ----
+*.tmp
+*.bak
+*.orig
