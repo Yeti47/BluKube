@@ -1,4 +1,10 @@
-# yt-cli-radio
+# yt-cli-radio → BluKube
+
+> **Status:** mid-refactor. The legacy PoC lives under [`poc/`](poc/); the new **BluKube** server/client implementation is under construction. See [`doc/refactor-plan.md`](doc/refactor-plan.md) for the full plan.
+
+---
+
+# yt-cli-radio (PoC)
 
 Interactive YouTube radio CLI using **.NET 10**, **headless Brave**, and Playwright automation.
 
