@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/BluKube.Server/BluKube.Server.csproj" />
+    <Project Path="src/BluKube.Cli/BluKube.Cli.csproj" />
+    <Project Path="src/BluKube.AppHost/BluKube.AppHost.csproj" />
+    <Project Path="src/BluKube.ServiceDefaults/BluKube.ServiceDefaults.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/BluKube.Server.Tests/BluKube.Server.Tests.csproj" />
+    <Project Path="tests/BluKube.Cli.Tests/BluKube.Cli.Tests.csproj" />
+  </Folder>
+</Solution>
