@@ -1,13 +1,22 @@
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+
 var builder = WebApplication.CreateBuilder(args);
 
-builder.AddServiceDefaults();
-
-// TODO: Phase 2 — register services, auth, controllers/minimal APIs
+builder.Services.AddHealthChecks();
+builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-app.MapDefaultEndpoints();
+app.MapOpenApi();
+app.MapHealthChecks("/health", new HealthCheckOptions { AllowCachingResponses = false });
+app.MapHealthChecks("/alive", new HealthCheckOptions
+{
+    Predicate = _ => false,
+    AllowCachingResponses = false
+});
 
-// TODO: Phase 2 — map /v1/* endpoints
+app.MapGet("/", () => "BluKube Server — OK");
+
+// TODO: Phase 2 — register ISessionManager, auth middleware, /v1/* endpoints
 
 app.Run();

@@ -1,0 +1,24 @@
+services:
+  blukube:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: blukube:latest
+    container_name: blukube
+    ports:
+      - "${BLUKUBE_PORT:-8765}:8765"
+    environment:
+      - BLUKUBE_TOKEN=${BLUKUBE_TOKEN:-}
+      - BLUKUBE_BIND=0.0.0.0:8765
+    volumes:
+      - blukube_data:/var/lib/blukube
+      - ${XDG_RUNTIME_DIR:-/run/user/1000}/pulse/native:/run/pulse/native:ro
+      - ${XDG_RUNTIME_DIR:-/run/user/1000}/pipewire-0:/run/pipewire/pipewire-0:ro
+    env_file:
+      - path: .env
+        required: false
+    restart: unless-stopped
+    tty: true
+
+volumes:
+  blukube_data:
