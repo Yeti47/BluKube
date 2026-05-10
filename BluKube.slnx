@@ -2,9 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/BluKube.Server/BluKube.Server.csproj" />
     <Project Path="src/BluKube.Cli/BluKube.Cli.csproj" />
-  </Folder>
-  <Folder Name="/tests/">
-    <Project Path="tests/BluKube.Server.Tests/BluKube.Server.Tests.csproj" />
-    <Project Path="tests/BluKube.Cli.Tests/BluKube.Cli.Tests.csproj" />
+    <Project Path="src/BluKube.Server.Tests/BluKube.Server.Tests.csproj" />
+    <Project Path="src/BluKube.Cli.Tests/BluKube.Cli.Tests.csproj" />
   </Folder>
 </Solution>

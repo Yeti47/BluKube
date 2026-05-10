@@ -12,8 +12,6 @@ services:
       - BLUKUBE_BIND=0.0.0.0:8765
     volumes:
       - blukube_data:/var/lib/blukube
-      - ${XDG_RUNTIME_DIR:-/run/user/1000}/pulse/native:/run/pulse/native:ro
-      - ${XDG_RUNTIME_DIR:-/run/user/1000}/pipewire-0:/run/pipewire/pipewire-0:ro
     env_file:
       - path: .env
         required: false

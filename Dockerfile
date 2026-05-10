@@ -1,17 +1,20 @@
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/nightly/sdk:11.0-preview AS build
 WORKDIR /src
 
 COPY BluKube.slnx ./
 COPY src/BluKube.Server/BluKube.Server.csproj src/BluKube.Server/
 COPY src/BluKube.Cli/BluKube.Cli.csproj src/BluKube.Cli/
-COPY tests/BluKube.Server.Tests/BluKube.Server.Tests.csproj tests/BluKube.Server.Tests/
-COPY tests/BluKube.Cli.Tests/BluKube.Cli.Tests.csproj tests/BluKube.Cli.Tests/
+COPY src/BluKube.Server.Tests/BluKube.Server.Tests.csproj src/BluKube.Server.Tests/
+COPY src/BluKube.Cli.Tests/BluKube.Cli.Tests.csproj src/BluKube.Cli.Tests/
 RUN dotnet restore BluKube.slnx
+
+RUN apt-get update && apt-get install -y --no-install-recommends xvfb && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY . .
 RUN dotnet publish src/BluKube.Server/BluKube.Server.csproj -c Release -o /app/publish --no-restore
+RUN dotnet test BluKube.slnx
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+FROM mcr.microsoft.com/dotnet/nightly/aspnet:11.0-preview AS runtime
 WORKDIR /app
 
 RUN apt-get update \

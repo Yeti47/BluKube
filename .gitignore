@@ -73,3 +73,6 @@ logs/
 *.tmp
 *.bak
 *.orig
+
+# ---- Caches ----
+*.lscache
