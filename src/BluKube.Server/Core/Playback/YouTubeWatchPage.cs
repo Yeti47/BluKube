@@ -318,7 +318,7 @@ public sealed class YouTubeWatchPage : IYouTubeWatchPage
         catch (PlaywrightException) { }
     }
 
-    private sealed class VideoCenter
+    private sealed record VideoCenter
     {
         public double X { get; init; }
         public double Y { get; init; }
