@@ -3,7 +3,7 @@ using BluKube.Server.Core.Engine.Browser;
 
 namespace BluKube.Server.Core.Playback;
 
-public sealed class YouTubeWatchPage : IYouTubeWatchPage
+public sealed class YouTubeWatchPage : IYouTubePage<WatchPageParams>
 {
     private const int PlaybackRetryDelayMs = 500;
     private const int PlaybackCheckDelayMs = 1200;

@@ -3,7 +3,7 @@ using Microsoft.Playwright;
 
 namespace BluKube.Server.Core.Engine.Browser;
 
-public sealed class BraveYouTubeBrowserLauncher : IYouTubeBrowserFactory
+public sealed class BraveYouTubeBrowserLauncher : IYouTubeBrowserLauncher
 {
     private static readonly string[] KnownBravePaths =
     [

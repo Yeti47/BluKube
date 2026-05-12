@@ -3,7 +3,7 @@ using BluKube.Server.Core.Engine.Browser;
 
 namespace BluKube.Server.Core.Search;
 
-public sealed class YouTubeSearchPage : IYouTubeSearchPage
+public sealed class YouTubeSearchPage : IYouTubePage<SearchPageParams>
 {
     private readonly IPage _page;
     private readonly SearchPageParams _parameters;
