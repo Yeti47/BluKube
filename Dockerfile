@@ -1,7 +1,10 @@
-FROM mcr.microsoft.com/dotnet/nightly/sdk:11.0-preview AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 COPY BluKube.slnx ./
+COPY src/BluKube.Contracts/BluKube.Contracts.csproj src/BluKube.Contracts/
+COPY src/BluKube.Client.Core/BluKube.Client.Core.csproj src/BluKube.Client.Core/
+COPY src/BluKube.Tui.Rendering/BluKube.Tui.Rendering.csproj src/BluKube.Tui.Rendering/
 COPY src/BluKube.Server/BluKube.Server.csproj src/BluKube.Server/
 COPY src/BluKube.Tui/BluKube.Tui.csproj src/BluKube.Tui/
 COPY src/BluKube.Server.Tests/BluKube.Server.Tests.csproj src/BluKube.Server.Tests/
@@ -12,9 +15,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends xvfb && apt-get
 
 COPY . .
 RUN dotnet publish src/BluKube.Server/BluKube.Server.csproj -c Release -o /app/publish --no-restore
-RUN dotnet test BluKube.slnx
+# Brave is only installed in the runtime stage, so skip tests that launch it during build.
+RUN dotnet test BluKube.slnx --filter "FullyQualifiedName!~BraveMediaPlayerIntegrationTests"
 
-FROM mcr.microsoft.com/dotnet/nightly/aspnet:11.0-preview AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
 RUN apt-get update \

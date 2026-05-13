@@ -1,12 +1,12 @@
 using System.Text.Json.Serialization;
-using BluKube.Server.Core.Search;
 
-namespace BluKube.Server.Core.Session;
+namespace BluKube.Contracts;
 
 /// <summary>
-/// Snapshot of a session's current observable state. Pushed to attached
-/// clients via the SignalR hub and returned from command methods so that
-/// callers always know what the world looks like after their action.
+/// Snapshot of a session's current observable state. Wire-level type.
+/// Pushed to attached clients via the SignalR hub and returned from
+/// command methods so that callers always know what the world looks
+/// like after their action.
 /// </summary>
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "kind")]
 [JsonDerivedType(typeof(IdleState), nameof(IdleState))]

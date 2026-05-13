@@ -17,10 +17,12 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <Using Include="BluKube.Contracts" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\BluKube.Server\BluKube.Server.csproj" />
+    <ProjectReference Include="..\BluKube.Contracts\BluKube.Contracts.csproj" />
   </ItemGroup>
 
 </Project>
