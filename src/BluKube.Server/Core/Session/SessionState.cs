@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using BluKube.Server.Core.Search;
 
 namespace BluKube.Server.Core.Session;
@@ -7,6 +8,11 @@ namespace BluKube.Server.Core.Session;
 /// clients via the SignalR hub and returned from command methods so that
 /// callers always know what the world looks like after their action.
 /// </summary>
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "kind")]
+[JsonDerivedType(typeof(IdleState), nameof(IdleState))]
+[JsonDerivedType(typeof(SearchResultsState), nameof(SearchResultsState))]
+[JsonDerivedType(typeof(PlaybackState), nameof(PlaybackState))]
+[JsonDerivedType(typeof(ErrorState), nameof(ErrorState))]
 public abstract record SessionState;
 
 public sealed record IdleState : SessionState;
