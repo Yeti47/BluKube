@@ -1,8 +1,8 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/BluKube.Server/BluKube.Server.csproj" />
-    <Project Path="src/BluKube.Cli/BluKube.Cli.csproj" />
+    <Project Path="src/BluKube.Tui/BluKube.Tui.csproj" />
     <Project Path="src/BluKube.Server.Tests/BluKube.Server.Tests.csproj" />
-    <Project Path="src/BluKube.Cli.Tests/BluKube.Cli.Tests.csproj" />
+    <Project Path="src/BluKube.Tui.Tests/BluKube.Tui.Tests.csproj" />
   </Folder>
 </Solution>

@@ -252,34 +252,34 @@ Auth: bearer token middleware applied to `/v1/*` and the hub. Health endpoints s
 
 ```mermaid
 sequenceDiagram
-    participant CLI
+    participant TUI
     participant Hub as SessionHub
     participant Sess as ISession
     participant Player as IMediaPlayer
     participant Brave as BraveYouTubeBrowser
 
-    CLI->>Hub: CreateSession()
+    TUI->>Hub: CreateSession()
     Hub->>Sess: SessionManager.Create()
     Sess-->>Hub: id
-    Hub-->>CLI: id
+    Hub-->>TUI: id
 
-    CLI->>Hub: AttachSession(id)
+    TUI->>Hub: AttachSession(id)
     Hub->>Sess: subscribe to State stream
     Sess-->>Hub: current SessionState
-    Hub-->>CLI: SessionState (Idle)
+    Hub-->>TUI: SessionState (Idle)
 
-    CLI->>Hub: Search("lo-fi beats", 10)
+    TUI->>Hub: Search("lo-fi beats", 10)
     Hub->>Sess: Search(...)
     Sess->>Player: SearchAsync(...)
     Player->>Brave: OpenSearchAsync(...)
     Brave-->>Player: ISearchPage
     Player-->>Sess: IReadOnlyList<MediaItem>
     Sess-->>Hub: SearchResultsState
-    Hub-->>CLI: SearchResultsState (reply)
+    Hub-->>TUI: SearchResultsState (reply)
     Sess->>Hub: State(SearchResultsState) (push)
-    Hub->>CLI: State(SearchResultsState)
+    Hub->>TUI: State(SearchResultsState)
 
-    CLI->>Hub: Play("dQw4...")
+    TUI->>Hub: Play("dQw4...")
     Hub->>Sess: Play(...)
     Sess->>Player: PlayAsync(...)
     Player->>Brave: OpenWatchAsync(...)
@@ -288,7 +288,7 @@ sequenceDiagram
     loop every 500ms while playing
         Player->>Sess: PlaybackEvent.PositionTick
         Sess->>Hub: State(PlaybackState)
-        Hub->>CLI: State(PlaybackState)
+        Hub->>TUI: State(PlaybackState)
     end
 ```
 

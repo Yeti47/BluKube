@@ -1,4 +1,4 @@
-namespace BluKube.Cli.Tests;
+namespace BluKube.Tui.Tests;
 
 public class PlaceholderTests
 {

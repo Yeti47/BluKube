@@ -1,1 +1,1 @@
-Console.WriteLine("BluKube CLI — coming soon.");
+Console.WriteLine("BluKube TUI — coming soon.");

@@ -3,35 +3,34 @@ using BluKube.Server.Core.Engine.Browser;
 
 namespace BluKube.Server.Core.Search;
 
-public sealed class YouTubeSearchPage : IYouTubePage<SearchPageParams>
+internal sealed class YouTubeSearchPage : ISearchPage
 {
     private readonly IPage _page;
-    private readonly SearchPageParams _parameters;
+    private readonly string _query;
+    private readonly int _limit;
 
-    private YouTubeSearchPage(IPage page, SearchPageParams parameters)
+    public YouTubeSearchPage(IPage page, string query, int limit)
     {
         _page = page;
-        _parameters = parameters;
+        _query = query;
+        _limit = limit;
     }
 
-    public static IYouTubePage<SearchPageParams> Create(IPage page, SearchPageParams parameters)
-        => new YouTubeSearchPage(page, parameters);
-
-    public async Task NavigateToAsync(CancellationToken cancellationToken)
+    public async Task NavigateAsync(CancellationToken ct)
     {
-        var url = $"https://www.youtube.com/results?search_query={Uri.EscapeDataString(_parameters.Query)}&hl=en&gl=US";
+        var url = $"https://www.youtube.com/results?search_query={Uri.EscapeDataString(_query)}&hl=en&gl=US";
         await _page.GotoAsync(url, new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = 30000 });
 
         var videoItems = _page.Locator("ytd-video-renderer");
         await videoItems.First.WaitForAsync(new LocatorWaitForOptions { Timeout = 30000 });
     }
 
-    public async Task<IReadOnlyList<MediaItem>> SearchAsync(CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<MediaItem>> ReadResultsAsync(CancellationToken ct)
     {
         var videoItems = _page.Locator("ytd-video-renderer");
         var count = await videoItems.CountAsync();
 
-        var bounded = Math.Min(count, _parameters.Limit);
+        var bounded = Math.Min(count, _limit);
         var results = new List<MediaItem>(bounded);
 
         for (var i = 0; i < bounded; i++)

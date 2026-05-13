@@ -20,7 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\BluKube.Cli\BluKube.Cli.csproj" />
+    <ProjectReference Include="..\BluKube.Tui\BluKube.Tui.csproj" />
   </ItemGroup>
 
 </Project>

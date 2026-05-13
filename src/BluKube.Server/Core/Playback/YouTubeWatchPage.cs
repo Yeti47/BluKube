@@ -3,26 +3,17 @@ using BluKube.Server.Core.Engine.Browser;
 
 namespace BluKube.Server.Core.Playback;
 
-public sealed class YouTubeWatchPage : IYouTubePage<WatchPageParams>
+internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
 {
     private const int PlaybackRetryDelayMs = 500;
     private const int PlaybackCheckDelayMs = 1200;
 
-    private readonly IPage _page;
-    private readonly WatchPageParams _parameters;
+    private readonly IPage _page = page;
 
-    private YouTubeWatchPage(IPage page, WatchPageParams parameters)
+    public async Task NavigateAsync(CancellationToken ct)
     {
-        _page = page;
-        _parameters = parameters;
-    }
-
-    public static IYouTubePage<WatchPageParams> Create(IPage page, WatchPageParams parameters)
-        => new YouTubeWatchPage(page, parameters);
-
-    public async Task NavigateToAsync(CancellationToken ct)
-    {
-        await _page.GotoAsync(_parameters.VideoUrl,
+        var url = $"https://www.youtube.com/watch?v={Uri.EscapeDataString(videoId)}";
+        await _page.GotoAsync(url,
             new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = 45000 });
 
         await DismissConsentAsync(_page);
@@ -40,33 +31,10 @@ public sealed class YouTubeWatchPage : IYouTubePage<WatchPageParams>
             new PageWaitForFunctionOptions { Timeout = 30000 });
     }
 
-    public Task<PlaybackSnapshot> GetSnapshotAsync(CancellationToken cancellationToken) =>
-        _page.EvaluateAsync<PlaybackSnapshot>(
-            """
-            () => {
-              const video =
-                document.querySelector("video.video-stream:not([aria-hidden='true'])") ??
-                document.querySelector("video.video-stream") ??
-                document.querySelector("video");
-              if (!video) {
-                return {
-                  paused: true, ended: false, muted: false,
-                  currentTime: 0, readyState: 0, networkState: 0, errorCode: null
-                };
-              }
-              return {
-                paused: !!video.paused,
-                ended: !!video.ended,
-                muted: !!video.muted,
-                currentTime: Number(video.currentTime || 0),
-                readyState: Number(video.readyState || 0),
-                networkState: Number(video.networkState || 0),
-                errorCode: video.error ? Number(video.error.code) : null
-              };
-            }
-            """);
+    public async Task<WatchSnapshot> ReadStateAsync(CancellationToken ct)
+        => (await ReadRawAsync()).ToSnapshot();
 
-    public async Task<bool> TryEnsurePlayingAsync(CancellationToken cancellationToken)
+    public async Task<WatchSnapshot> EnsurePlayingAsync(CancellationToken ct)
     {
         var page = _page;
         await page.BringToFrontAsync();
@@ -75,10 +43,10 @@ public sealed class YouTubeWatchPage : IYouTubePage<WatchPageParams>
         {
             await DismissConsentAsync(page);
 
-            var before = await GetSnapshotAsync(cancellationToken);
+            var before = await ReadRawAsync();
             if (!before.Paused && !before.Ended)
             {
-                return true;
+                return before.ToSnapshot();
             }
 
             await page.EvaluateAsync(
@@ -93,9 +61,10 @@ public sealed class YouTubeWatchPage : IYouTubePage<WatchPageParams>
                 }
                 """);
 
-            if (await TryPlayDomAsync(page) && await WaitForProgressAsync(page, before))
+            if (await TryPlayDomAsync(page))
             {
-                return true;
+                var (progressed, after) = await WaitForProgressAsync(page, before);
+                if (progressed) return after.ToSnapshot();
             }
 
             switch (attempt % 3)
@@ -105,19 +74,21 @@ public sealed class YouTubeWatchPage : IYouTubePage<WatchPageParams>
                 case 2: await TryClickVideoSurfaceAsync(page); break;
             }
 
-            if (await TryPlayDomAsync(page) && await WaitForProgressAsync(page, before))
+            if (await TryPlayDomAsync(page))
             {
-                return true;
+                var (progressed, after) = await WaitForProgressAsync(page, before);
+                if (progressed) return after.ToSnapshot();
             }
 
-            await Task.Delay(PlaybackRetryDelayMs, cancellationToken);
+            await Task.Delay(PlaybackRetryDelayMs, ct);
         }
 
-        return false;
+        throw new InvalidOperationException("Could not start playback after retries.");
     }
 
-    public Task PauseAsync(CancellationToken cancellationToken) =>
-        _page.EvaluateAsync(
+    public async Task<WatchSnapshot> PauseAsync(CancellationToken ct)
+    {
+        await _page.EvaluateAsync(
             """
             () => {
               const video =
@@ -128,9 +99,12 @@ public sealed class YouTubeWatchPage : IYouTubePage<WatchPageParams>
               video.pause();
             }
             """);
+        return (await ReadRawAsync()).ToSnapshot();
+    }
 
-    public Task ResumeAsync(CancellationToken cancellationToken) =>
-        _page.EvaluateAsync(
+    public async Task<WatchSnapshot> ResumeAsync(CancellationToken ct)
+    {
+        await _page.EvaluateAsync(
             """
             async () => {
               const video =
@@ -141,9 +115,12 @@ public sealed class YouTubeWatchPage : IYouTubePage<WatchPageParams>
               try { await video.play(); } catch { }
             }
             """);
+        return (await ReadRawAsync()).ToSnapshot();
+    }
 
-    public Task SeekRelativeAsync(double deltaSeconds, CancellationToken cancellationToken) =>
-        _page.EvaluateAsync(
+    public async Task<WatchSnapshot> SeekToAsync(TimeSpan position, CancellationToken ct)
+    {
+        await _page.EvaluateAsync(
             $$"""
             () => {
               const video =
@@ -151,25 +128,15 @@ public sealed class YouTubeWatchPage : IYouTubePage<WatchPageParams>
                 document.querySelector("video.video-stream") ??
                 document.querySelector("video");
               if (!video) return;
-              video.currentTime += {{deltaSeconds}};
+              video.currentTime = {{position.TotalSeconds}};
             }
             """);
+        return (await ReadRawAsync()).ToSnapshot();
+    }
 
-    public Task SeekToAsync(double seconds, CancellationToken cancellationToken) =>
-        _page.EvaluateAsync(
-            $$"""
-            () => {
-              const video =
-                document.querySelector("video.video-stream:not([aria-hidden='true'])") ??
-                document.querySelector("video.video-stream") ??
-                document.querySelector("video");
-              if (!video) return;
-              video.currentTime = {{seconds}};
-            }
-            """);
-
-    public Task SetVolumeAsync(double volume, CancellationToken cancellationToken) =>
-        _page.EvaluateAsync(
+    public async Task<WatchSnapshot> SetVolumeAsync(float volume, CancellationToken ct)
+    {
+        await _page.EvaluateAsync(
             $$"""
             () => {
               const video =
@@ -180,19 +147,39 @@ public sealed class YouTubeWatchPage : IYouTubePage<WatchPageParams>
               video.volume = {{volume}};
             }
             """);
+        return (await ReadRawAsync()).ToSnapshot();
+    }
 
-    public Task<bool> IsEndedAsync(CancellationToken cancellationToken) =>
-        _page.EvaluateAsync<bool>(
+    private Task<RawState> ReadRawAsync() =>
+        _page.EvaluateAsync<RawState>(
             """
             () => {
               const video =
                 document.querySelector("video.video-stream:not([aria-hidden='true'])") ??
                 document.querySelector("video.video-stream") ??
                 document.querySelector("video");
-              if (!video) return false;
-              return !!video.ended;
+              if (!video) {
+                return {
+                  paused: true, ended: false, muted: false,
+                  currentTime: 0, duration: 0, volume: 1,
+                  readyState: 0, networkState: 0, errorCode: null
+                };
+              }
+              return {
+                paused: !!video.paused,
+                ended: !!video.ended,
+                muted: !!video.muted,
+                currentTime: Number(video.currentTime || 0),
+                duration: Number.isFinite(video.duration) ? Number(video.duration) : 0,
+                volume: Number(video.volume ?? 1),
+                readyState: Number(video.readyState || 0),
+                networkState: Number(video.networkState || 0),
+                errorCode: video.error ? Number(video.error.code) : null
+              };
             }
             """);
+
+
 
     private static async Task DismissConsentAsync(IPage page)
     {
@@ -270,14 +257,15 @@ public sealed class YouTubeWatchPage : IYouTubePage<WatchPageParams>
         }
     }
 
-    private async Task<bool> WaitForProgressAsync(IPage page, PlaybackSnapshot before)
+    private async Task<(bool Progressed, RawState After)> WaitForProgressAsync(IPage page, RawState before)
     {
         await page.WaitForTimeoutAsync(PlaybackCheckDelayMs);
-        var after = await GetSnapshotAsync(CancellationToken.None);
+        var after = await ReadRawAsync();
 
-        return !after.Paused && !after.Ended &&
-               (after.CurrentTime > before.CurrentTime + 0.15 ||
-                (after.CurrentTime > 0.15 && after.ReadyState >= 3));
+        var progressed = !after.Paused && !after.Ended &&
+            (after.CurrentTime > before.CurrentTime + 0.15 ||
+             (after.CurrentTime > 0.15 && after.ReadyState >= 3));
+        return (progressed, after);
     }
 
     private static async Task TryClickPlayButtonAsync(IPage page)
@@ -318,9 +306,26 @@ public sealed class YouTubeWatchPage : IYouTubePage<WatchPageParams>
         catch (PlaywrightException) { }
     }
 
-    private sealed record VideoCenter
+    private sealed record RawState
     {
-        public double X { get; init; }
-        public double Y { get; init; }
+        public bool Paused { get; init; }
+        public bool Ended { get; init; }
+        public bool Muted { get; init; }
+        public double CurrentTime { get; init; }
+        public double Duration { get; init; }
+        public double Volume { get; init; }
+        public int ReadyState { get; init; }
+        public int NetworkState { get; init; }
+        public int? ErrorCode { get; init; }
+
+        public WatchSnapshot ToSnapshot()
+            => new(
+                Position: TimeSpan.FromSeconds(Math.Max(0, CurrentTime)),
+                Duration: TimeSpan.FromSeconds(Math.Max(0, Duration)),
+                IsPlaying: !Paused && !Ended,
+                IsEnded: Ended,
+                Volume: Muted ? 0f : (float)Math.Clamp(Volume, 0d, 1d));
     }
+
+    private sealed record VideoCenter(double X, double Y);
 }

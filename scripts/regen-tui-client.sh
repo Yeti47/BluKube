@@ -7,9 +7,9 @@ cd "$(dirname "$0")/.."
 echo "==> Generating OpenAPI document from BluKube.Server..."
 dotnet build src/BluKube.Server --nologo -c Release
 
-# The NSwag MSBuild target is wired in BluKube.Cli.csproj.
-# Building the CLI project triggers regeneration.
-echo "==> Regenerating BluKube.Cli/ApiClient/BluKubeClient.cs..."
-dotnet build src/BluKube.Cli --nologo
+# The NSwag MSBuild target is wired in BluKube.Tui.csproj.
+# Building the TUI project triggers regeneration.
+echo "==> Regenerating BluKube.Tui/ApiClient/BluKubeClient.cs..."
+dotnet build src/BluKube.Tui --nologo
 
 echo "==> Done."

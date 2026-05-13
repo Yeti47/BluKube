@@ -1,286 +1,187 @@
+using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 using System.Threading.Channels;
-using BluKube.Server.Core.Engine.Browser;
-using BluKube.Server.Core.Engine.Display;
-using BluKube.Server.Core.Playback;
-using BluKube.Server.Core.Search;
+using BluKube.Server.Core.Domain;
 
 namespace BluKube.Server.Core.Session;
 
+/// <summary>
+/// A single user session. Holds the current <see cref="SessionState"/>,
+/// translates engine-level events to state updates, and fans out to any
+/// number of subscribers. All engine work is delegated to the injected
+/// <see cref="IMediaPlayer"/> and <see cref="IMediaSearch"/>.
+/// </summary>
 public sealed class BrowserSession : IBrowserSession
 {
-    private readonly IDisplay _display;
-    private readonly IYouTubeBrowser _browser;
-    private readonly Channel<SessionSnapshot> _snapshotChannel;
+    private readonly IMediaPlayer _player;
+    private readonly IMediaSearch _search;
     private readonly CancellationTokenSource _disposeCts = new();
-    
-    private string? _currentVideoId;
-    private TimeSpan? _currentDuration;
-    private Task? _pollingTask;
-    
+    private readonly ConcurrentDictionary<Guid, Channel<SessionState>> _subscribers = new();
+    private readonly object _stateLock = new();
+
+    private SessionState _current = new IdleState();
+    private long _lastActivityTicks = DateTimeOffset.UtcNow.UtcTicks;
+    private Task? _eventPump;
+
     public Guid Id { get; } = Guid.NewGuid();
 
-    public BrowserSession(IDisplay display, IYouTubeBrowser browser)
+    public SessionState Current
     {
-        _display = display;
-        _browser = browser;
-        _snapshotChannel = Channel.CreateUnbounded<SessionSnapshot>(new UnboundedChannelOptions
+        get { lock (_stateLock) { return _current; } }
+    }
+
+    public DateTimeOffset LastActivityAt
+        => new(Interlocked.Read(ref _lastActivityTicks), TimeSpan.Zero);
+
+    public BrowserSession(IMediaPlayer player, IMediaSearch search)
+    {
+        _player = player;
+        _search = search;
+        _eventPump = Task.Run(PumpPlayerEventsAsync);
+    }
+
+    public Task<SessionState> SearchAsync(string query, int limit, CancellationToken ct = default)
+        => RunAsync("search_failed", async linkedCt =>
+        {
+            var results = await _search.SearchAsync(query, limit, linkedCt);
+            return (SessionState)new SearchResultsState(query, results);
+        }, ct);
+
+    public Task<SessionState> PlayAsync(string videoId, CancellationToken ct = default)
+        => RunAsync("play_failed", async linkedCt =>
+            (SessionState)ToPlaybackState(await _player.PlayAsync(videoId, linkedCt)), ct);
+
+    public Task<SessionState> PauseAsync(CancellationToken ct = default)
+        => RunAsync("pause_failed", async linkedCt =>
+            (SessionState)ToPlaybackState(await _player.PauseAsync(linkedCt)), ct);
+
+    public Task<SessionState> ResumeAsync(CancellationToken ct = default)
+        => RunAsync("resume_failed", async linkedCt =>
+            (SessionState)ToPlaybackState(await _player.ResumeAsync(linkedCt)), ct);
+
+    public Task<SessionState> SeekToAsync(TimeSpan position, CancellationToken ct = default)
+        => RunAsync("seek_failed", async linkedCt =>
+            (SessionState)ToPlaybackState(await _player.SeekToAsync(position, linkedCt)), ct);
+
+    public Task<SessionState> SetVolumeAsync(float volume, CancellationToken ct = default)
+        => RunAsync("volume_failed", async linkedCt =>
+            (SessionState)ToPlaybackState(await _player.SetVolumeAsync(volume, linkedCt)), ct);
+
+    public async IAsyncEnumerable<SessionState> States(
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        var channel = Channel.CreateUnbounded<SessionState>(new UnboundedChannelOptions
         {
             SingleReader = true,
-            SingleWriter = true
+            SingleWriter = false
         });
-    }
+        var key = Guid.NewGuid();
+        _subscribers[key] = channel;
+        Touch();
 
-    public async Task<SessionSnapshot> DispatchAsync(ClientEvent clientEvent, CancellationToken cancellationToken = default)
-    {
-        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _disposeCts.Token);
-        var ct = cts.Token;
+        // Yield current state immediately so subscribers always have a baseline.
+        yield return Current;
 
-        var snapshot = clientEvent switch
-        {
-            SearchEvent search => await HandleSearchAsync(search, ct),
-            PlayEvent play => await HandlePlayAsync(play, ct),
-            PauseEvent => await HandlePauseAsync(ct),
-            ResumeEvent => await HandleResumeAsync(ct),
-            SetVolumeEvent volume => await HandleSetVolumeAsync(volume, ct),
-            SeekToEvent seek => await HandleSeekToAsync(seek, ct),
-        };
-
-        await PushSnapshotAsync(snapshot, ct);
-        return snapshot;
-    }
-
-    private async Task<SessionSnapshot> HandleSearchAsync(SearchEvent search, CancellationToken ct)
-    {
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, _disposeCts.Token);
         try
         {
-            StopPolling();
-            
-            var searchPage = await _browser.GoToAsync<YouTubeSearchPage, SearchPageParams>(
-                new SearchPageParams(search.Query, search.Limit), ct);
-            
-            if (searchPage == null)
+            await foreach (var state in channel.Reader.ReadAllAsync(linked.Token))
             {
-                return new Error("Failed to navigate to search page");
+                yield return state;
             }
+        }
+        finally
+        {
+            _subscribers.TryRemove(key, out _);
+        }
+    }
 
-            var results = await searchPage.SearchAsync(ct);
-            return new SearchResults(search.Query, results);
+    private async Task<SessionState> RunAsync(
+        string errorCode,
+        Func<CancellationToken, Task<SessionState>> action,
+        CancellationToken ct)
+    {
+        Touch();
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, _disposeCts.Token);
+        SessionState result;
+        try
+        {
+            result = await action(linked.Token);
+        }
+        catch (OperationCanceledException) when (linked.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
-            return new Error($"Search failed: {ex.Message}");
+            result = new ErrorState(errorCode, ex.Message, Current);
         }
+
+        Publish(result);
+        return result;
     }
 
-    private async Task<SessionSnapshot> HandlePlayAsync(PlayEvent play, CancellationToken ct)
+    private async Task PumpPlayerEventsAsync()
     {
         try
         {
-            StopPolling();
-            
-            _currentVideoId = play.VideoId;
-            
-            var watchPage = await _browser.GoToAsync<YouTubeWatchPage, WatchPageParams>(
-                new WatchPageParams(play.VideoId), ct);
-            
-            if (watchPage == null)
+            await foreach (var ev in _player.Events(_disposeCts.Token))
             {
-                return new Error("Failed to navigate to watch page");
-            }
-
-            await watchPage.TryEnsurePlayingAsync(ct);
-            
-            // Get initial snapshot for duration
-            var rawSnapshot = await watchPage.GetSnapshotAsync(ct);
-            _currentDuration = rawSnapshot.Ended 
-                ? TimeSpan.Zero 
-                : TimeSpan.FromSeconds(rawSnapshot.CurrentTime * 2); // Estimate until we have real duration
-            
-            // Start polling for position updates
-            StartPolling();
-            
-            return CreatePlaybackSnapshot(rawSnapshot, isPlaying: true);
-        }
-        catch (Exception ex)
-        {
-            return new Error($"Play failed: {ex.Message}");
-        }
-    }
-
-    private async Task<SessionSnapshot> HandlePauseAsync(CancellationToken ct)
-    {
-        try
-        {
-            if (_browser.CurrentPage is not YouTubeWatchPage watchPage)
-            {
-                return new Error("Not on a watch page");
-            }
-
-            await watchPage.PauseAsync(ct);
-            var rawSnapshot = await watchPage.GetSnapshotAsync(ct);
-            
-            return CreatePlaybackSnapshot(rawSnapshot, isPlaying: false);
-        }
-        catch (Exception ex)
-        {
-            return new Error($"Pause failed: {ex.Message}");
-        }
-    }
-
-    private async Task<SessionSnapshot> HandleResumeAsync(CancellationToken ct)
-    {
-        try
-        {
-            if (_browser.CurrentPage is not YouTubeWatchPage watchPage)
-            {
-                return new Error("Not on a watch page");
-            }
-
-            await watchPage.ResumeAsync(ct);
-            
-            // Restart polling if it was stopped
-            StartPolling();
-            
-            var rawSnapshot = await watchPage.GetSnapshotAsync(ct);
-            return CreatePlaybackSnapshot(rawSnapshot, isPlaying: true);
-        }
-        catch (Exception ex)
-        {
-            return new Error($"Resume failed: {ex.Message}");
-        }
-    }
-
-    private async Task<SessionSnapshot> HandleSetVolumeAsync(SetVolumeEvent volume, CancellationToken ct)
-    {
-        try
-        {
-            if (_browser.CurrentPage is not YouTubeWatchPage watchPage)
-            {
-                return new Error("Not on a watch page");
-            }
-
-            await watchPage.SetVolumeAsync(volume.Value, ct);
-            var rawSnapshot = await watchPage.GetSnapshotAsync(ct);
-            var isPlaying = !rawSnapshot.Paused && !rawSnapshot.Ended;
-            
-            return CreatePlaybackSnapshot(rawSnapshot, isPlaying);
-        }
-        catch (Exception ex)
-        {
-            return new Error($"SetVolume failed: {ex.Message}");
-        }
-    }
-
-    private async Task<SessionSnapshot> HandleSeekToAsync(SeekToEvent seek, CancellationToken ct)
-    {
-        try
-        {
-            if (_browser.CurrentPage is not YouTubeWatchPage watchPage)
-            {
-                return new Error("Not on a watch page");
-            }
-
-            await watchPage.SeekToAsync(seek.Seconds, ct);
-            var rawSnapshot = await watchPage.GetSnapshotAsync(ct);
-            var isPlaying = !rawSnapshot.Paused && !rawSnapshot.Ended;
-            
-            return CreatePlaybackSnapshot(rawSnapshot, isPlaying);
-        }
-        catch (Exception ex)
-        {
-            return new Error($"SeekTo failed: {ex.Message}");
-        }
-    }
-
-    private Playback CreatePlaybackSnapshot(PlaybackSnapshot raw, bool isPlaying)
-    {
-        return new Playback(
-            _currentVideoId ?? "",
-            TimeSpan.FromSeconds(raw.CurrentTime),
-            _currentDuration ?? TimeSpan.FromSeconds(raw.CurrentTime * 2),
-            isPlaying && !raw.Paused && !raw.Ended,
-            raw.Muted ? 0f : 1f);
-    }
-
-    private void StartPolling()
-    {
-        if (_pollingTask != null) return;
-        
-        _pollingTask = Task.Run(async () =>
-        {
-            try
-            {
-                while (!_disposeCts.Token.IsCancellationRequested)
+                switch (ev)
                 {
-                    await Task.Delay(500, _disposeCts.Token);
-                    
-                    if (_browser.CurrentPage is not YouTubeWatchPage watchPage)
-                        continue;
-
-                    var rawSnapshot = await watchPage.GetSnapshotAsync(_disposeCts.Token);
-                    var isPlaying = !rawSnapshot.Paused && !rawSnapshot.Ended;
-                    
-                    // Update duration if available
-                    if (rawSnapshot.CurrentTime > 0)
-                    {
-                        _currentDuration = TimeSpan.FromSeconds(rawSnapshot.CurrentTime * 2); // Estimate
-                    }
-                    
-                    var snapshot = CreatePlaybackSnapshot(rawSnapshot, isPlaying);
-                    await PushSnapshotAsync(snapshot, _disposeCts.Token);
+                    case PositionChanged pc:
+                        Publish(ToPlaybackState(pc.Snapshot));
+                        break;
+                    case PlaybackFailed pf:
+                        Publish(new ErrorState(pf.Code, pf.Message, Current));
+                        break;
                 }
             }
-            catch (OperationCanceledException)
-            {
-                // Expected on disposal
-            }
-            catch (Exception)
-            {
-                // Log and stop polling on error
-            }
-        });
+        }
+        catch (OperationCanceledException) { /* dispose */ }
+        catch (Exception ex)
+        {
+            Publish(new ErrorState("event_pump_failed", ex.Message, Current));
+        }
     }
 
-    private void StopPolling()
-    {
-        // Just stop creating new poll tasks; existing task will complete naturally
-        // We don't cancel the token as that would cancel the whole session
-        _pollingTask = null;
-    }
+    private static PlaybackState ToPlaybackState(PlayerSnapshot s)
+        => new(s.VideoId, s.Position, s.Duration, s.IsPlaying, s.Volume);
 
-    private async Task PushSnapshotAsync(SessionSnapshot snapshot, CancellationToken ct)
-    {
-        await _snapshotChannel.Writer.WriteAsync(snapshot, ct);
-    }
+    private void Touch()
+        => Interlocked.Exchange(ref _lastActivityTicks, DateTimeOffset.UtcNow.UtcTicks);
 
-    public IAsyncEnumerable<SessionSnapshot> Snapshots(CancellationToken cancellationToken = default)
+    private void Publish(SessionState state)
     {
-        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _disposeCts.Token);
-        return _snapshotChannel.Reader.ReadAllAsync(cts.Token);
+        lock (_stateLock)
+        {
+            _current = state;
+        }
+
+        foreach (var sub in _subscribers.Values)
+        {
+            sub.Writer.TryWrite(state);
+        }
     }
 
     public async ValueTask DisposeAsync()
     {
-        _disposeCts.Cancel();
-        
-        try
-        {
-            _snapshotChannel.Writer.Complete();
-        }
-        catch { }
+        try { _disposeCts.Cancel(); } catch { }
 
-        try
+        foreach (var sub in _subscribers.Values)
         {
-            await _browser.DisposeAsync();
+            sub.Writer.TryComplete();
         }
-        catch { }
+        _subscribers.Clear();
 
-        try
+        if (_eventPump is { } pump)
         {
-            await _display.DisposeAsync();
+            try { await pump; } catch { }
+            _eventPump = null;
         }
-        catch { }
-        
+
+        try { await _player.DisposeAsync(); } catch { }
+
         _disposeCts.Dispose();
     }
 }

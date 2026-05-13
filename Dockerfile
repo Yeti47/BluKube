@@ -3,9 +3,9 @@ WORKDIR /src
 
 COPY BluKube.slnx ./
 COPY src/BluKube.Server/BluKube.Server.csproj src/BluKube.Server/
-COPY src/BluKube.Cli/BluKube.Cli.csproj src/BluKube.Cli/
+COPY src/BluKube.Tui/BluKube.Tui.csproj src/BluKube.Tui/
 COPY src/BluKube.Server.Tests/BluKube.Server.Tests.csproj src/BluKube.Server.Tests/
-COPY src/BluKube.Cli.Tests/BluKube.Cli.Tests.csproj src/BluKube.Cli.Tests/
+COPY src/BluKube.Tui.Tests/BluKube.Tui.Tests.csproj src/BluKube.Tui.Tests/
 RUN dotnet restore BluKube.slnx
 
 RUN apt-get update && apt-get install -y --no-install-recommends xvfb && apt-get clean && rm -rf /var/lib/apt/lists/*

@@ -21,7 +21,7 @@
   </PropertyGroup>
 
   <Target Name="NSwag" AfterTargets="PostBuildEvent" Condition=" '$(DesignTimeBuild)' != 'true' And '$(BuildingProject)' == 'true' And Exists('$(ProjectDir)../BluKube.Server/obj/openapi.json') ">
-    <Exec Command="$(NSwagExe_Net90) openapi2csclient /Input:../BluKube.Server/obj/openapi.json /Output:ApiClient/BluKubeClient.cs /Namespace:BluKube.Cli.ApiClient /GenerateClientInterfaces:true /InjectHttpClient:true /ExceptionClass:BluKubeApiException /ClassName:BluKubeClient /UseBaseUrl:false" />
+    <Exec Command="$(NSwagExe_Net90) openapi2csclient /Input:../BluKube.Server/obj/openapi.json /Output:ApiClient/BluKubeClient.cs /Namespace:BluKube.Tui.ApiClient /GenerateClientInterfaces:true /InjectHttpClient:true /ExceptionClass:BluKubeApiException /ClassName:BluKubeClient /UseBaseUrl:false" />
   </Target>
 
 </Project>
