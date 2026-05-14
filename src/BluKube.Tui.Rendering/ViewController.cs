@@ -16,7 +16,8 @@ public sealed class ViewController(
     IKeyInput keys,
     BluKubeConnection connection,
     string? initialQuery = null,
-    int limit = 10)
+    int limit = 10,
+    bool enableQuitKeys = true)
 {
     private readonly IView[] _views =
     [
@@ -118,9 +119,10 @@ public sealed class ViewController(
     // Dispatch
     // -------------------------------------------------------------------------
 
-    private static bool ShouldQuit(KeyPress key, ViewMode mode)
-        => key is { Key: Key.Q, Ctrl: true } ||
-           key.Key == Key.Q && mode is ViewMode.Results or ViewMode.Player;
+    private bool ShouldQuit(KeyPress key, ViewMode mode)
+        => enableQuitKeys &&
+           (key is { Key: Key.Q, Ctrl: true } ||
+           key.Key == Key.Q && mode is ViewMode.Results or ViewMode.Player);
 
     private Task DispatchAsync(KeyPress key, UiState state, Channel<bool> redraw, CancellationToken ct)
     {
@@ -132,7 +134,7 @@ public sealed class ViewController(
     // Layout
     // -------------------------------------------------------------------------
 
-    private static IRenderable BuildLayout(UiState state)
+    private IRenderable BuildLayout(UiState state)
     {
         IRenderable body = state.Mode switch
         {
@@ -144,9 +146,9 @@ public sealed class ViewController(
 
         var footer = state.Mode switch
         {
-            ViewMode.Search  => "enter search  •  esc clear  •  ctrl+q quit",
-            ViewMode.Results => "↑/↓ select  •  ←/→ page  •  enter play  •  esc search  •  q quit",
-            ViewMode.Player  => "space play/pause  •  ←/→ seek  •  ↑/↓ volume  •  esc search  •  q quit",
+            ViewMode.Search  => enableQuitKeys ? "enter search  •  esc clear  •  ctrl+q quit" : "enter search  •  esc clear",
+            ViewMode.Results => enableQuitKeys ? "↑/↓ select  •  ←/→ page  •  enter play  •  esc search  •  q quit" : "↑/↓ select  •  ←/→ page  •  enter play  •  esc search",
+            ViewMode.Player  => enableQuitKeys ? "space play/pause  •  ←/→ seek  •  ↑/↓ volume  •  esc search  •  q quit" : "space play/pause  •  ←/→ seek  •  ↑/↓ volume  •  esc search",
             _                => string.Empty
         };
 

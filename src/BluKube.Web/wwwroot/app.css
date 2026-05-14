@@ -1,0 +1,161 @@
+html, body {
+    --terminal-font: "Cascadia Mono", "Cascadia Code", "Fira Mono", "DejaVu Sans Mono", "Liberation Mono", "Noto Sans Mono", monospace;
+    margin: 0;
+    padding: 0;
+    background: #0d1117;
+    color: #c9d1d9;
+    font-family: var(--terminal-font);
+    overflow: hidden;
+}
+
+#xterm-container {
+    flex: 1;
+    min-height: 0; /* allow flex child to shrink below content size */
+    overflow: hidden;
+}
+
+#xterm-container .xterm-viewport {
+    overflow-y: hidden !important;
+}
+
+/* ── terminal page (logo + terminal) ── */
+.terminal-page {
+    display: flex;
+    flex-direction: column;
+    width: 100vw;
+    height: 100vh;
+    padding: 12px 16px 8px;
+    box-sizing: border-box;
+    gap: 8px;
+}
+
+.terminal-header {
+    flex-shrink: 0;
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+}
+
+.terminal-logo {
+    min-width: 0;
+    overflow: hidden;
+}
+
+.logo-art {
+    margin: 0;
+    padding: 0;
+    color: #388bfd;
+    font-family: var(--terminal-font);
+    font-variant-ligatures: none;
+    font-feature-settings: "liga" 0, "calt" 0;
+    font-size: 0.7rem;
+    line-height: 1.2;
+    text-shadow: 0 0 8px rgba(56, 139, 253, 0.4);
+    white-space: pre;
+}
+
+.logout-button {
+    position: absolute;
+    top: 0;
+    right: 0;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    color: #8b949e;
+    cursor: pointer;
+    font-family: var(--terminal-font);
+    font-size: 0.78rem;
+    line-height: 1;
+    padding: 0.42rem 0.65rem;
+}
+
+.logout-button:hover {
+    border-color: #58a6ff;
+    color: #c9d1d9;
+}
+
+/* ── loading ── */
+.loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    color: #8b949e;
+}
+
+/* ── setup form ── */
+.setup {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    gap: 1rem;
+}
+
+.setup h1 {
+    color: #58a6ff;
+    margin: 0 0 0.5rem;
+}
+
+.setup p {
+    color: #8b949e;
+    margin: 0;
+}
+
+.setup .field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    width: 360px;
+}
+
+.setup label {
+    font-size: 0.85rem;
+    color: #8b949e;
+}
+
+.setup input {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    color: #c9d1d9;
+    font-family: inherit;
+    font-size: 0.95rem;
+    padding: 0.5rem 0.75rem;
+    outline: none;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.setup input:focus {
+    border-color: #58a6ff;
+}
+
+.setup button {
+    background: #238636;
+    border: none;
+    border-radius: 6px;
+    color: #fff;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.95rem;
+    padding: 0.5rem 1.5rem;
+    margin-top: 0.5rem;
+}
+
+.setup button:hover:not(:disabled) {
+    background: #2ea043;
+}
+
+.setup button:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.setup .error {
+    color: #f85149;
+    font-size: 0.85rem;
+    margin: 0;
+}

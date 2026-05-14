@@ -37,7 +37,7 @@ internal sealed class ResultsTable(
                 table.AddRow(
                     string.Empty,
                     i == midRow
-                        ? "[bold blue on blue] Loading... [/]"
+                        ? "[bold white on blue] Loading... [/]"
                         : $"[grey]{Markup.Escape(ViewHelpers.Truncate(item.Title, 60))}[/]",
                     $"[grey]{Markup.Escape(item.Channel)}[/]",
                     $"[grey]{ViewHelpers.FormatTime(item.Duration)}[/]");

@@ -1,0 +1,320 @@
+@page "/"
+@rendermode InteractiveServer
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject IConfigStore ConfigStore
+@using Concentus
+@using BluKube.Contracts
+@using Spectre.Console
+@using BluKube.Web.Storage
+
+@if (_mode == AppMode.Loading)
+{
+    <div class="loading">Loading…</div>
+}
+else if (_mode == AppMode.Setup)
+{
+    <form class="setup" @onsubmit="SaveConfigAsync" @onsubmit:preventDefault>
+        <h1>BluKube</h1>
+        <p>Enter your server details to get started.</p>
+        <div class="field">
+            <label for="serverUrl">Server URL</label>
+            <input id="serverUrl" type="url" placeholder="http://localhost:8765"
+                   @bind="_serverUrl" @bind:event="oninput" />
+        </div>
+        <div class="field">
+            <label for="token">Token</label>
+            <input id="token" type="password" placeholder="(leave blank if not required)"
+                   @bind="_token" @bind:event="oninput" />
+        </div>
+        @if (_setupError is not null)
+        {
+            <p class="error">@_setupError</p>
+        }
+        <button type="submit" disabled="@string.IsNullOrWhiteSpace(_serverUrl)">
+            Connect
+        </button>
+    </form>
+}
+else
+{
+    <div class="terminal-page">
+        <header class="terminal-header">
+            <div class="terminal-logo">
+                <pre class="logo-art"><span>&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2557; &#x2588;&#x2588;&#x2557;     &#x2588;&#x2588;&#x2557;   &#x2588;&#x2588;&#x2557;&#x2588;&#x2588;&#x2557;  &#x2588;&#x2588;&#x2557;&#x2588;&#x2588;&#x2557;   &#x2588;&#x2588;&#x2557;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2557; &#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2557;
+&#x2588;&#x2588;&#x2554;&#x2550;&#x2550;&#x2588;&#x2588;&#x2557;&#x2588;&#x2588;&#x2551;     &#x2588;&#x2588;&#x2551;   &#x2588;&#x2588;&#x2551;&#x2588;&#x2588;&#x2551; &#x2588;&#x2588;&#x2554;&#x255D;&#x2588;&#x2588;&#x2551;   &#x2588;&#x2588;&#x2551;&#x2588;&#x2588;&#x2554;&#x2550;&#x2550;&#x2588;&#x2588;&#x2557;&#x2588;&#x2588;&#x2554;&#x2550;&#x2550;&#x2550;&#x2550;&#x255D;
+&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2554;&#x255D;&#x2588;&#x2588;&#x2551;     &#x2588;&#x2588;&#x2551;   &#x2588;&#x2588;&#x2551;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2554;&#x255D; &#x2588;&#x2588;&#x2551;   &#x2588;&#x2588;&#x2551;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2554;&#x255D;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2557;  
+&#x2588;&#x2588;&#x2554;&#x2550;&#x2550;&#x2588;&#x2588;&#x2557;&#x2588;&#x2588;&#x2551;     &#x2588;&#x2588;&#x2551;   &#x2588;&#x2588;&#x2551;&#x2588;&#x2588;&#x2554;&#x2550;&#x2588;&#x2588;&#x2557; &#x2588;&#x2588;&#x2551;   &#x2588;&#x2588;&#x2551;&#x2588;&#x2588;&#x2554;&#x2550;&#x2550;&#x2588;&#x2588;&#x2557;&#x2588;&#x2588;&#x2554;&#x2550;&#x2550;&#x255D;  
+&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2554;&#x255D;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2557;&#x255A;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2554;&#x255D;&#x2588;&#x2588;&#x2551;  &#x2588;&#x2588;&#x2557;&#x255A;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2554;&#x255D;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2554;&#x255D;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2557;
+&#x255A;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x255D; &#x255A;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x255D; &#x255A;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x255D; &#x255A;&#x2550;&#x255D;  &#x255A;&#x2550;&#x255D; &#x255A;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x255D; &#x255A;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x255D; &#x255A;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x255D;</span></pre>
+            </div>
+            <button class="logout-button" type="button" @onclick="ClearConfigAsync" title="Clear saved server URL and token">
+                Log out
+            </button>
+        </header>
+        <div id="xterm-container"></div>
+    </div>
+}
+
+@code {
+    private enum AppMode { Loading, Setup, Terminal }
+
+    // ── view state ───────────────────────────────────────────────────────────
+    private AppMode _mode = AppMode.Loading;
+    private bool    _pendingInit;
+
+    // ── setup form state ─────────────────────────────────────────────────────
+    private string  _serverUrl  = string.Empty;
+    private string  _token      = string.Empty;
+    private string? _setupError;
+
+    // ── xterm bridge ────────────────────────────────────────────────────────
+    private readonly XtermWriter   _writer   = new();
+    private readonly XtermKeyInput _keyInput = new();
+
+    // ── lifecycle handles ───────────────────────────────────────────────────
+    private DotNetObjectReference<Home>? _ref;
+    private CancellationTokenSource _cts = new();
+    private Task? _viewTask;
+    private Task? _pumpTask;
+    private Task? _audioTask;
+    private BluKubeConnection? _connection;
+    // ── Blazor lifecycle ─────────────────────────────────────────────────────
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _ref = DotNetObjectReference.Create(this);
+
+            var settings = await ConfigStore.LoadAsync(_cts.Token);
+            if (settings is null)
+            {
+                _mode = AppMode.Setup;
+            }
+            else
+            {
+                _mode        = AppMode.Terminal;
+                _pendingInit = true;
+            }
+            StateHasChanged();
+            return;
+        }
+
+        if (_pendingInit)
+        {
+            _pendingInit = false;
+            try
+            {
+                await InitAsync();
+            }
+            catch (Exception ex)
+            {
+                _writer.WriteLine($"\x1b[31mError: {ex.Message}\x1b[0m");
+            }
+        }
+    }
+
+    // ── setup form handler ────────────────────────────────────────────────────
+
+    private async Task SaveConfigAsync()
+    {
+        _setupError = null;
+
+        if (string.IsNullOrWhiteSpace(_serverUrl)) return;
+
+        if (!Uri.TryCreate(_serverUrl.Trim(), UriKind.Absolute, out var uri)
+            || (uri.Scheme != "http" && uri.Scheme != "https"))
+        {
+            _setupError = "Please enter a valid http/https URL.";
+            return;
+        }
+
+        var token = string.IsNullOrWhiteSpace(_token) ? null : _token.Trim();
+        await ConfigStore.SaveAsync(new ConnectionSettings(uri, token), _cts.Token);
+
+        _mode        = AppMode.Terminal;
+        _pendingInit = true;
+        // StateHasChanged is implicit after a Blazor event handler
+    }
+
+    private async Task ClearConfigAsync()
+    {
+        await ConfigStore.ClearAsync(CancellationToken.None);
+        await StopTerminalAsync();
+
+        _cts.Dispose();
+        _cts = new CancellationTokenSource();
+
+        _serverUrl = string.Empty;
+        _token = string.Empty;
+        _setupError = null;
+        _pendingInit = false;
+        _mode = AppMode.Setup;
+    }
+
+    // ── terminal initialisation ───────────────────────────────────────────────
+
+    private async Task InitAsync()
+    {
+        var dims = await JS.InvokeAsync<TerminalDims>(
+            "xtermBridge.init", _ref, "xterm-container");
+
+        var console = AnsiConsole.Create(new AnsiConsoleSettings
+        {
+            Ansi        = AnsiSupport.Yes,
+            ColorSystem = ColorSystemSupport.TrueColor,
+            Out         = new AnsiConsoleOutput(_writer),
+            Interactive = InteractionSupport.No,
+        });
+        console.Profile.Width  = dims.Cols;
+        console.Profile.Height = dims.Rows;
+
+        _pumpTask = PumpOutputAsync();
+
+        var settings = await ConfigStore.LoadAsync(_cts.Token)
+            ?? throw new InvalidOperationException("No connection settings found.");
+
+        _connection = new BluKubeConnection(settings);
+        await _connection.ConnectAsync(_cts.Token);
+        _ = await _connection.CreateSessionAsync(_cts.Token);
+
+        _audioTask = PumpAudioAsync();
+
+        var vc = new ViewController(console, _keyInput, _connection, enableQuitKeys: false);
+        _viewTask = vc.RunAsync(_cts.Token);
+    }
+
+    // ── JS invokable ─────────────────────────────────────────────────────────
+
+    [JSInvokable]
+    public void OnXtermKey(string key, bool shift, bool ctrl) =>
+        _keyInput.Post(key, shift, ctrl);
+
+    // ── audio pump ───────────────────────────────────────────────────────
+
+    private async Task PumpAudioAsync()
+    {
+        if (_connection is null) return;
+
+        var decoder = OpusCodecFactory.CreateDecoder(AudioFormat.SampleRate, AudioFormat.Channels);
+        var pcm = new short[AudioFormat.SamplesPerFrame * AudioFormat.Channels];
+        var batch = new byte[AudioFormat.PcmBytesPerFrame * 4];
+        var batchBytes = 0;
+        var batchFrames = 0;
+
+        try
+        {
+            await foreach (var packet in _connection.StreamAudioAsync(_cts.Token))
+            {
+                int decodedSamples;
+                try
+                {
+                    decodedSamples = decoder.Decode(packet, pcm, AudioFormat.SamplesPerFrame);
+                }
+                catch
+                {
+                    continue;
+                }
+
+                if (decodedSamples <= 0) continue;
+
+                var byteCount = decodedSamples * AudioFormat.Channels * sizeof(short);
+                if (batchBytes + byteCount > batch.Length && batchBytes > 0)
+                {
+                    await JS.InvokeVoidAsync(
+                        "xtermBridge.writeAudio",
+                        _cts.Token,
+                        Convert.ToBase64String(batch, 0, batchBytes));
+                    batchBytes = 0;
+                    batchFrames = 0;
+                }
+
+                Buffer.BlockCopy(pcm, 0, batch, batchBytes, byteCount);
+                batchBytes += byteCount;
+                batchFrames++;
+
+                if (batchFrames < 4) continue;
+
+                await JS.InvokeVoidAsync(
+                    "xtermBridge.writeAudio",
+                    _cts.Token,
+                    Convert.ToBase64String(batch, 0, batchBytes));
+                batchBytes = 0;
+                batchFrames = 0;
+            }
+
+            if (batchBytes > 0)
+            {
+                await JS.InvokeVoidAsync(
+                    "xtermBridge.writeAudio",
+                    _cts.Token,
+                    Convert.ToBase64String(batch, 0, batchBytes));
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (JSDisconnectedException)    { }
+        catch (Exception ex)
+        {
+            _writer.WriteLine($"\x1b[33maudio stopped: {ex.Message}\x1b[0m");
+        }
+    }
+
+    // ── output pump ─────────────────────────────────────────────────────────
+
+    private async Task PumpOutputAsync()
+    {
+        try
+        {
+            await foreach (var chunk in _writer.Output.ReadAllAsync(_cts.Token))
+                await JS.InvokeVoidAsync("xtermBridge.write", _cts.Token, chunk);
+        }
+        catch (OperationCanceledException) { }
+        catch (JSDisconnectedException)    { }
+    }
+
+    // ── disposal ─────────────────────────────────────────────────────────────
+
+    private async Task StopTerminalAsync()
+    {
+        var connection = _connection;
+        var viewTask = _viewTask;
+        var pumpTask = _pumpTask;
+        var audioTask = _audioTask;
+
+        try { await _cts.CancelAsync(); } catch { }
+
+        if (viewTask  is not null) try { await viewTask;  } catch { }
+        if (pumpTask  is not null) try { await pumpTask;  } catch { }
+        if (audioTask is not null) try { await audioTask; } catch { }
+
+        if (connection?.SessionId is Guid sessionId)
+        {
+            try { await connection.CloseSessionAsync(sessionId, CancellationToken.None); } catch { }
+        }
+
+        if (connection is not null)
+        {
+            try { await connection.DisposeAsync(); } catch { }
+        }
+
+        try { await JS.InvokeVoidAsync("xtermBridge.dispose"); } catch { }
+
+        _viewTask = null;
+        _pumpTask = null;
+        _audioTask = null;
+        _connection = null;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _keyInput.Complete();
+        _ref?.Dispose();
+        _writer.Dispose();
+        await StopTerminalAsync();
+
+        _cts.Dispose();
+    }
+
+    private sealed record TerminalDims(int Cols, int Rows);
+}
