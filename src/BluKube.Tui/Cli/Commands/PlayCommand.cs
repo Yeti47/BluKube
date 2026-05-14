@@ -22,7 +22,7 @@ public sealed class PlayCommand(
 
         [CommandOption("--limit <N>")]
         [Description("Number of search results to fetch.")]
-        public int Limit { get; init; } = 10;
+        public int Limit { get; init; } = 30;
     }
 
     public override async Task<int> ExecuteAsync(CommandContext context, Settings s)
@@ -48,7 +48,7 @@ public sealed class PlayCommand(
                 catch (Exception ex) { console.MarkupLine($"[yellow]audio stopped:[/] {Markup.Escape(ex.Message)}"); }
             }, audioCts.Token);
 
-            var view = new PlayerView(console, new ConsoleKeyInput(), conn, s.Query, s.Limit);
+            var view = new ViewController(console, new ConsoleKeyInput(), conn, s.Query, s.Limit);
             await view.RunAsync(ct);
         }
         finally

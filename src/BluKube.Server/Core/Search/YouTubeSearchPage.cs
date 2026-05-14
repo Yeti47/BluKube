@@ -23,6 +23,32 @@ internal sealed class YouTubeSearchPage : ISearchPage
 
         var videoItems = _page.Locator("ytd-video-renderer");
         await videoItems.First.WaitForAsync(new LocatorWaitForOptions { Timeout = 30000 });
+
+        // YouTube lazy-renders results as the user scrolls. Scroll in a loop
+        // until we have at least _limit items or two consecutive scrolls yield
+        // no new items (end of available results).
+        var previousCount = 0;
+        var stallCount = 0;
+        const int maxStalls = 2;
+
+        while (!ct.IsCancellationRequested)
+        {
+            var count = await videoItems.CountAsync();
+            if (count >= _limit) break;
+
+            if (count == previousCount)
+            {
+                if (++stallCount >= maxStalls) break;
+            }
+            else
+            {
+                stallCount = 0;
+            }
+
+            previousCount = count;
+            await _page.EvaluateAsync("window.scrollBy(0, window.innerHeight)");
+            await _page.WaitForTimeoutAsync(800);
+        }
     }
 
     public async Task<IReadOnlyList<MediaItem>> ReadResultsAsync(CancellationToken ct)

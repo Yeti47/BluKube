@@ -16,7 +16,7 @@ services.AddSingleton<IConfigStore>(sp => sp.GetRequiredService<FileConfigStore>
 services.AddSingleton<ConnectionResolver>();
 services.AddSingleton(typeof(CancellationToken), cts.Token);
 
-var app = new CommandApp(new TypeRegistrar(services));
+var app = new CommandApp<PlayCommand>(new TypeRegistrar(services));
 app.Configure(c =>
 {
     c.SetApplicationName("blukube");
