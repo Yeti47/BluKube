@@ -4,7 +4,7 @@ This directory contains repository automation for publishing BluKube release art
 
 ## Publish Workflow
 
-[publish.yml](workflows/publish.yml) runs on:
+[publish.yml](publish.yml) runs on:
 
 - tags matching `v*`
 - manual dispatch
@@ -18,6 +18,12 @@ It also publishes a self-contained Linux x64 TUI archive:
 
 - workflow artifact: `blukube-tui-linux-x64`
 - release asset on `v*` tags: `blukube-linux-x64.tar.gz`
+
+Tagged releases also include a short usage section with:
+
+- a brief BluKube description
+- `docker run` examples for the server and web images
+- basic extraction and startup instructions for the TUI binary
 
 ## Tag Releases
 

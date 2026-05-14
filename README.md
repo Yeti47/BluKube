@@ -60,7 +60,7 @@ More concretely:
 
 ## Releases
 
-If you want to use BluKube without building it yourself, start with the [GitHub releases page](https://github.com/Yeti47/yt-cli-radio/releases).
+If you want to use BluKube without building it yourself, start with the [GitHub releases page](https://github.com/Yeti47/BluKube/releases).
 
 Releases provide:
 
