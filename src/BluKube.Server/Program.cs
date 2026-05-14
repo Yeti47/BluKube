@@ -69,6 +69,8 @@ builder.Services.AddSignalR();
 // --- Engine factories — singletons; each session asks for a fresh instance. -
 builder.Services.AddSingleton<IDisplayFactory, XvfbDisplayFactory>();
 builder.Services.AddSingleton<IYouTubeBrowserLauncher, BraveYouTubeBrowserLauncher>();
+builder.Services.AddSingleton<BluKube.Server.Core.Engine.Audio.IAudioOutputDeviceFactory,
+    BluKube.Server.Core.Engine.Audio.PulseAudioOutputDeviceFactory>();
 
 // --- Session registry — singleton; owns the lifetime of all sessions. -------
 builder.Services.AddSingleton<ISessionManager, SessionManager>();

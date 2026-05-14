@@ -57,5 +57,8 @@ internal sealed class FakeBrowserSession : IBrowserSession
         await Task.CompletedTask;
     }
 
+    public IAsyncEnumerable<byte[]> AudioFrames(CancellationToken ct = default)
+        => throw new InvalidOperationException("Audio not configured for endpoint test fake.");
+
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }

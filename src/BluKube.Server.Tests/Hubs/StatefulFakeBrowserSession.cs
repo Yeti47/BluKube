@@ -50,5 +50,18 @@ internal sealed class StatefulFakeBrowserSession : IBrowserSession
             yield return s;
     }
 
+    public async IAsyncEnumerable<byte[]> AudioFrames(
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        // Test fake: emit a couple of opaque opus-shaped packets, then idle
+        // until cancellation. Real opus payload is irrelevant for hub tests;
+        // they just need to verify framing & delivery.
+        for (int i = 0; i < 3 && !ct.IsCancellationRequested; i++)
+        {
+            yield return new byte[] { 0xFC, (byte)i, 0x00, 0x00 };
+        }
+        try { await Task.Delay(Timeout.Infinite, ct); } catch (OperationCanceledException) { }
+    }
+
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }

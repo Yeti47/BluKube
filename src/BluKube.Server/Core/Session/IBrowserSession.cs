@@ -30,4 +30,11 @@ public interface IBrowserSession : IAsyncDisposable
     /// each receive their own enumeration.
     /// </summary>
     IAsyncEnumerable<SessionState> States(CancellationToken ct = default);
+
+    /// <summary>
+    /// Server-streamed Opus packets captured from this session's browser
+    /// audio output. See <see cref="BluKube.Contracts.AudioFormat"/> for the
+    /// expected packet format.
+    /// </summary>
+    IAsyncEnumerable<byte[]> AudioFrames(CancellationToken ct = default);
 }

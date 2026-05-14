@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
+using BluKube.Server.Core.Engine.Audio;
 using BluKube.Server.Core.Domain;
 
 namespace BluKube.Server.Core.Session;
@@ -15,6 +16,7 @@ public sealed class BrowserSession : IBrowserSession
 {
     private readonly IMediaPlayer _player;
     private readonly IMediaSearch _search;
+    private readonly IAudioOutputDevice? _audio;
     private readonly CancellationTokenSource _disposeCts = new();
     private readonly ConcurrentDictionary<Guid, Channel<SessionState>> _subscribers = new();
     private readonly object _stateLock = new();
@@ -33,10 +35,11 @@ public sealed class BrowserSession : IBrowserSession
     public DateTimeOffset LastActivityAt
         => new(Interlocked.Read(ref _lastActivityTicks), TimeSpan.Zero);
 
-    public BrowserSession(IMediaPlayer player, IMediaSearch search)
+    public BrowserSession(IMediaPlayer player, IMediaSearch search, IAudioOutputDevice? audio = null)
     {
         _player = player;
         _search = search;
+        _audio = audio;
         _eventPump = Task.Run(PumpPlayerEventsAsync);
     }
 
@@ -93,6 +96,22 @@ public sealed class BrowserSession : IBrowserSession
         finally
         {
             _subscribers.TryRemove(key, out _);
+        }
+    }
+
+    public async IAsyncEnumerable<byte[]> AudioFrames(
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        if (_audio is null)
+        {
+            throw new InvalidOperationException("Audio output is not configured for this session.");
+        }
+
+        Touch();
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, _disposeCts.Token);
+        await foreach (var packet in _audio.StreamOpusAsync(linked.Token))
+        {
+            yield return packet;
         }
     }
 
@@ -181,6 +200,10 @@ public sealed class BrowserSession : IBrowserSession
         }
 
         try { await _player.DisposeAsync(); } catch { }
+        if (_audio is not null)
+        {
+            try { await _audio.DisposeAsync(); } catch { }
+        }
 
         _disposeCts.Dispose();
     }

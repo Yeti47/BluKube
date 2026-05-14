@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using BluKube.Server.Configuration;
+using BluKube.Server.Core.Engine.Audio;
 using BluKube.Server.Core.Domain;
 using BluKube.Server.Core.Engine.Browser;
 using BluKube.Server.Core.Engine.Display;
@@ -11,6 +12,7 @@ public sealed class SessionManager : ISessionManager, IAsyncDisposable
 {
     private readonly IDisplayFactory _displayFactory;
     private readonly IYouTubeBrowserLauncher _browserLauncher;
+    private readonly IAudioOutputDeviceFactory _audioFactory;
     private readonly ILogger<SessionManager> _logger;
     private readonly TimeProvider _clock;
     private readonly SessionLimits _options;
@@ -21,12 +23,14 @@ public sealed class SessionManager : ISessionManager, IAsyncDisposable
     public SessionManager(
         IDisplayFactory displayFactory,
         IYouTubeBrowserLauncher browserLauncher,
+        IAudioOutputDeviceFactory audioFactory,
         IOptions<SessionLimits> options,
         ILogger<SessionManager> logger,
         TimeProvider? clock = null)
     {
         _displayFactory = displayFactory;
         _browserLauncher = browserLauncher;
+        _audioFactory = audioFactory;
         _options = options.Value;
         _logger = logger;
         _clock = clock ?? TimeProvider.System;
@@ -42,10 +46,20 @@ public sealed class SessionManager : ISessionManager, IAsyncDisposable
         }
 
         var display = await _displayFactory.CreateAsync(cancellationToken);
-        var browser = await _browserLauncher.LaunchAsync(display, cancellationToken);
+        IAudioOutputDevice? audio = null;
+        try
+        {
+            audio = await _audioFactory.CreateAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Audio output device creation failed; session will have no audio stream");
+        }
+
+        var browser = await _browserLauncher.LaunchAsync(display, audio?.SinkName, cancellationToken);
 
         var player = new BraveMediaPlayer(display, browser);
-        var session = new BrowserSession(player, player);
+        var session = new BrowserSession(player, player, audio);
 
         if (!_sessions.TryAdd(session.Id, session))
         {

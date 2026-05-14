@@ -212,6 +212,29 @@ public sealed class SessionHubTests : IClassFixture<HubFactory>, IAsyncLifetime
         Assert.Contains(received, s => s is PlaybackState);
     }
 
+    [Fact]
+    public async Task StreamAudio_YieldsOpusPackets()
+    {
+        var hub = await SessionAsync();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+
+        var packets = new List<byte[]>();
+        try
+        {
+            await foreach (var pkt in hub.StreamAsync<byte[]>("StreamAudio", cts.Token))
+            {
+                packets.Add(pkt);
+                if (packets.Count >= 3) break;
+            }
+        }
+        catch (OperationCanceledException) { }
+
+        Assert.Equal(3, packets.Count);
+        Assert.All(packets, p => Assert.NotEmpty(p));
+        // First byte from the test fake's synthetic packets.
+        Assert.Equal(0xFC, packets[0][0]);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private HubConnection Track(HubConnection hub) { _connections.Add(hub); return hub; }

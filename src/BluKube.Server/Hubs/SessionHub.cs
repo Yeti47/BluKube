@@ -82,6 +82,16 @@ public class SessionHub : Hub<ISessionClient>
         }
     }
 
+    public async IAsyncEnumerable<byte[]> StreamAudio(
+        [EnumeratorCancellation] CancellationToken ct)
+    {
+        var session = await RequireSessionAsync();
+        await foreach (var packet in session.AudioFrames(ct))
+        {
+            yield return packet;
+        }
+    }
+
     // --- Connection lifecycle ------------------------------------------------
 
     public override Task OnDisconnectedAsync(Exception? exception)

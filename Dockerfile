@@ -27,7 +27,7 @@ RUN apt-get update \
        libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libgbm1 \
        libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 \
        libpango-1.0-0 libcairo2 libasound2t64 libpulse0 \
-       pulseaudio-utils \
+       pulseaudio pulseaudio-utils \
     && curl -fsSLo /usr/share/keyrings/brave-browser-archive-keyring.gpg \
        https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg \
     && echo "deb [signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg] https://brave-browser-apt-release.s3.brave.com/ stable main" \
@@ -39,15 +39,21 @@ RUN apt-get update \
 
 ENV BRAVE_EXECUTABLE_PATH=/usr/bin/brave-browser
 
-RUN useradd --create-home --shell /bin/bash blukube
+RUN useradd --create-home --shell /bin/bash --uid 1000 blukube \
+    && mkdir -p /run/user/1000 \
+    && chown blukube:blukube /run/user/1000 \
+    && chmod 700 /run/user/1000
 
 COPY --from=build /app/publish ./
+COPY docker/entrypoint.sh /app/entrypoint.sh
 RUN mkdir -p /var/lib/blukube \
     && chown -R blukube:blukube /app /var/lib/blukube \
+    && chmod +x /app/entrypoint.sh \
     && chmod -R a+rX /app/.playwright \
     && chmod a+rx /app/.playwright/node/linux-x64/node
 
 USER blukube
+ENV XDG_RUNTIME_DIR=/run/user/1000
 VOLUME /var/lib/blukube
 
 ENV BLUKUBE_BIND=0.0.0.0:8765
@@ -56,4 +62,4 @@ EXPOSE 8765
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
     CMD curl -sf http://127.0.0.1:8765/health || exit 1
 
-ENTRYPOINT ["dotnet", "BluKube.Server.dll"]
+ENTRYPOINT ["/app/entrypoint.sh"]

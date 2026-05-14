@@ -19,12 +19,12 @@ public sealed class BraveYouTubeBrowserLauncher : IYouTubeBrowserLauncher
         _bravePathOverride = bravePathOverride;
     }
 
-    public async Task<IYouTubeBrowser> LaunchAsync(IDisplay display, CancellationToken cancellationToken)
+    public async Task<IYouTubeBrowser> LaunchAsync(IDisplay display, string? pulseSink, CancellationToken cancellationToken)
     {
         var bravePath = ResolveBravePath();
         var playwright = await Playwright.CreateAsync();
 
-        var braveEnv = InheritAndPatchEnvironment(display);
+        var braveEnv = InheritAndPatchEnvironment(display, pulseSink);
 
         var browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
         {
@@ -85,7 +85,7 @@ public sealed class BraveYouTubeBrowserLauncher : IYouTubeBrowserLauncher
                 "Unable to find Brave executable. Set BRAVE_EXECUTABLE_PATH.");
     }
 
-    private static Dictionary<string, string> InheritAndPatchEnvironment(IDisplay display)
+    private static Dictionary<string, string> InheritAndPatchEnvironment(IDisplay display, string? pulseSink)
     {
         var env = new Dictionary<string, string>(StringComparer.Ordinal);
 
@@ -100,6 +100,11 @@ public sealed class BraveYouTubeBrowserLauncher : IYouTubeBrowserLauncher
         env["DISPLAY"] = display.DisplayValue;
         env.Remove("WAYLAND_DISPLAY");
         env.Remove("XDG_SESSION_TYPE");
+
+        if (!string.IsNullOrWhiteSpace(pulseSink))
+        {
+            env["PULSE_SINK"] = pulseSink;
+        }
 
         return env;
     }

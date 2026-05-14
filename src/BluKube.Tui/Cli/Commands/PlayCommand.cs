@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using BluKube.Client.Core;
+using BluKube.Client.Core.Audio;
 using BluKube.Tui.Configuration;
 using BluKube.Tui.Input;
 using BluKube.Tui.Rendering;
@@ -33,6 +34,15 @@ public sealed class PlayCommand(
         var sessionId = await conn.CreateSessionAsync(ct);
         console.MarkupLine($"[grey]session[/] {sessionId}");
 
+        await using var audio = new AudioPlayer();
+        using var audioCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var audioTask = Task.Run(async () =>
+        {
+            try { await audio.PlayAsync(conn.StreamAudioAsync(audioCts.Token), audioCts.Token); }
+            catch (OperationCanceledException) { }
+            catch (Exception ex) { console.MarkupLine($"[yellow]audio stopped:[/] {Markup.Escape(ex.Message)}"); }
+        }, audioCts.Token);
+
         if (!string.IsNullOrWhiteSpace(s.Query))
         {
             var state = await conn.SearchAsync(s.Query, s.Limit, ct);
@@ -54,6 +64,9 @@ public sealed class PlayCommand(
 
         var view = new PlayerView(console, new ConsoleKeyInput(), conn);
         await view.RunAsync(ct);
+
+        try { audioCts.Cancel(); } catch { }
+        try { await audioTask; } catch { }
 
         try { await conn.CloseSessionAsync(sessionId, CancellationToken.None); }
         catch { /* best-effort */ }

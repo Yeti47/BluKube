@@ -22,7 +22,7 @@ public sealed class BraveMediaPlayerIntegrationTests
     {
         await using var display = await new XvfbDisplayFactory().CreateAsync(CancellationToken.None);
         await using var browser = await new BraveYouTubeBrowserLauncher()
-            .LaunchAsync(display, CancellationToken.None);
+            .LaunchAsync(display, pulseSink: null, CancellationToken.None);
         await using var player = new BraveMediaPlayer(display, browser);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(90));

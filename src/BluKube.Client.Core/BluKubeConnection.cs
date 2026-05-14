@@ -97,6 +97,14 @@ public sealed class BluKubeConnection(ConnectionSettings settings) : IAsyncDispo
     public IAsyncEnumerable<SessionState> StreamStatesAsync(CancellationToken ct = default)
         => Require().StreamAsync<SessionState>("StreamStates", ct);
 
+    /// <summary>
+    /// Server-streamed Opus audio packets for the attached session. Each
+    /// element is one Opus packet; format is described by
+    /// <see cref="AudioFormat"/>.
+    /// </summary>
+    public IAsyncEnumerable<byte[]> StreamAudioAsync(CancellationToken ct = default)
+        => Require().StreamAsync<byte[]>("StreamAudio", ct);
+
     private HubConnection Require()
         => _hub ?? throw new InvalidOperationException("Not connected. Call ConnectAsync first.");
 
