@@ -6,3 +6,4 @@ obj
 .vscode
 .idea
 TestResults
+src/BluKube.Web

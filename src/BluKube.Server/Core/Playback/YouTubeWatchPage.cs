@@ -32,6 +32,8 @@ internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
             }
             """,
             new PageWaitForFunctionOptions { Timeout = 30000 });
+
+            await EnsureOriginalAudioAsync(_page);
     }
 
     public async Task<WatchSnapshot> ReadStateAsync(CancellationToken ct)
@@ -48,6 +50,7 @@ internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
         for (var attempt = 0; attempt < 5; attempt++)
         {
             await DismissConsentAsync(page);
+            await EnsureOriginalAudioAsync(page);
 
             var before = await ReadRawAsync();
             if (!before.Paused && !before.Ended)
@@ -224,6 +227,87 @@ internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
         }
     }
 
+        private static async Task EnsureOriginalAudioAsync(IPage page)
+        {
+                try
+                {
+                        var result = await page.EvaluateAsync<AudioTrackSelectionResult>(
+                                """
+                                () => {
+                                    const player = document.getElementById('movie_player');
+                                    if (!player?.getAudioTrack || !player?.setAudioTrack) {
+                                        return { attempted: false, switched: false };
+                                    }
+
+                                    const describe = track => ({
+                                        id: track?.id ?? track?.PD?.id ?? null,
+                                        isDefault: !!(track?.isDefault ?? track?.PD?.isDefault),
+                                        isAutoDubbed: !!(track?.isAutoDubbed ?? track?.PD?.isAutoDubbed),
+                                        name: String(track?.name ?? track?.PD?.name ?? '')
+                                    });
+
+                                    const isOriginalTrack = track => {
+                                        const id = String(track?.id ?? '').toLowerCase();
+                                        const name = String(track?.name ?? '').toLowerCase();
+                                        return id.includes('original') || name.includes('original');
+                                    };
+
+                                    const current = describe(player.getAudioTrack());
+                                    const tracks = (player.getAvailableAudioTracks?.() ?? []).map(track => ({ raw: track, info: describe(track) }));
+
+                                    const preferred = tracks.find(track => isOriginalTrack(track.info))
+                                        ?? tracks.find(track => track.info.isDefault && !track.info.isAutoDubbed)
+                                        ?? tracks.find(track => !track.info.isAutoDubbed)
+                                        ?? null;
+
+                                    if (!preferred) {
+                                        return {
+                                            attempted: tracks.length > 0 || !!current.id,
+                                            switched: false,
+                                            current,
+                                            availableTracks: tracks.map(track => track.info)
+                                        };
+                                    }
+
+                                    const shouldSwitch = current.id !== preferred.info.id || current.isAutoDubbed;
+                                    if (!shouldSwitch) {
+                                        return {
+                                            attempted: true,
+                                            switched: false,
+                                            current,
+                                            selected: preferred.info,
+                                            availableTracks: tracks.map(track => track.info)
+                                        };
+                                    }
+
+                                    try {
+                                        player.setAudioTrack(preferred.raw);
+                                    } catch {
+                                        if (preferred.info.id) {
+                                            try { player.setAudioTrack(preferred.info.id); } catch { }
+                                        }
+                                    }
+
+                                    const after = describe(player.getAudioTrack());
+                                    return {
+                                        attempted: true,
+                                        switched: after.id === preferred.info.id && !after.isAutoDubbed,
+                                        current,
+                                        selected: preferred.info,
+                                        after,
+                                        availableTracks: tracks.map(track => track.info)
+                                    };
+                                }
+                                """);
+
+                        if (result.Attempted && result.Switched)
+                        {
+                                await page.WaitForTimeoutAsync(250);
+                        }
+                }
+                catch { }
+        }
+
     private async Task<(bool Progressed, RawState After)> WaitForProgressAsync(IPage page, RawState before)
     {
         await page.WaitForTimeoutAsync(PlaybackCheckDelayMs);
@@ -292,6 +376,24 @@ internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
                 IsPlaying: !Paused && !Ended,
                 IsEnded: Ended,
                 Volume: Muted ? 0f : (float)Math.Clamp(Volume, 0d, 1d));
+    }
+
+    private sealed record AudioTrackInfo
+    {
+        public string? Id { get; init; }
+        public bool IsDefault { get; init; }
+        public bool IsAutoDubbed { get; init; }
+        public string Name { get; init; } = string.Empty;
+    }
+
+    private sealed record AudioTrackSelectionResult
+    {
+        public bool Attempted { get; init; }
+        public bool Switched { get; init; }
+        public AudioTrackInfo? Current { get; init; }
+        public AudioTrackInfo? Selected { get; init; }
+        public AudioTrackInfo? After { get; init; }
+        public IReadOnlyList<AudioTrackInfo> AvailableTracks { get; init; } = Array.Empty<AudioTrackInfo>();
     }
 
     private sealed record VideoCenter(double X, double Y);
