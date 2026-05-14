@@ -24,14 +24,14 @@ else if (_mode == AppMode.Setup)
         </div>
         <div class="field">
             <label for="token">Token</label>
-            <input id="token" type="password" placeholder="(leave blank if not required)"
+            <input id="token" type="password" placeholder="Enter your access token" required
                    @bind="_token" @bind:event="oninput" />
         </div>
         @if (_setupError is not null)
         {
             <p class="error">@_setupError</p>
         }
-        <button type="submit" disabled="@string.IsNullOrWhiteSpace(_serverUrl)">
+        <button type="submit" disabled="@string.IsNullOrWhiteSpace(_serverUrl) || string.IsNullOrWhiteSpace(_token)">
             Connect
         </button>
     </form>
@@ -121,7 +121,11 @@ else
     {
         _setupError = null;
 
-        if (string.IsNullOrWhiteSpace(_serverUrl)) return;
+        if (string.IsNullOrWhiteSpace(_serverUrl) || string.IsNullOrWhiteSpace(_token))
+        {
+            _setupError = "Server URL and token are required.";
+            return;
+        }
 
         if (!Uri.TryCreate(_serverUrl.Trim(), UriKind.Absolute, out var uri)
             || (uri.Scheme != "http" && uri.Scheme != "https"))
@@ -130,8 +134,7 @@ else
             return;
         }
 
-        var token = string.IsNullOrWhiteSpace(_token) ? null : _token.Trim();
-        await ConfigStore.SaveAsync(new ConnectionSettings(uri, token), _cts.Token);
+        await ConfigStore.SaveAsync(new ConnectionSettings(uri, _token.Trim()), _cts.Token);
 
         _mode        = AppMode.Terminal;
         _pendingInit = true;
