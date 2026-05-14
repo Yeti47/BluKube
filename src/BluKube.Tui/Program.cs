@@ -21,8 +21,6 @@ app.Configure(c =>
 {
     c.SetApplicationName("blukube");
     c.AddCommand<PlayCommand>("play").WithDescription("Search and play. Drops into the live TUI.");
-    c.AddCommand<AttachCommand>("attach").WithDescription("Attach the TUI to an existing session.");
-    c.AddCommand<SessionsCommand>("sessions").WithDescription("List, create, or close sessions.");
     c.AddCommand<ConfigCommand>("config").WithDescription("Show or clear stored connection config.");
 });
 

@@ -89,7 +89,7 @@ public sealed class PlayerView(IAnsiConsole console, IKeyInput keys, BluKubeConn
 
                 try
                 {
-                    await DispatchAsync(key, box.Current, ct);
+                    await DispatchAsync(key, box, redraw, ct);
                 }
                 catch (Exception ex)
                 {
@@ -101,15 +101,22 @@ public sealed class PlayerView(IAnsiConsole console, IKeyInput keys, BluKubeConn
         catch (OperationCanceledException) { }
     }
 
-    private async Task DispatchAsync(KeyPress key, SessionState current, CancellationToken ct)
+    private async Task DispatchAsync(KeyPress key, StateBox box, Channel<bool> redraw, CancellationToken ct)
     {
+        var current = box.Current;
         switch (key.Key)
         {
             case Key.Space:
                 if (current is PlaybackState pb)
                 {
-                    if (pb.IsPlaying) await connection.PauseAsync(ct);
-                    else await connection.ResumeAsync(ct);
+                    box.Current = pb with { IsPlaying = !pb.IsPlaying };
+                    await redraw.Writer.WriteAsync(true, ct);
+
+                    var confirmed = pb.IsPlaying
+                        ? await connection.PauseAsync(ct)
+                        : await connection.ResumeAsync(ct);
+                    box.Current = confirmed;
+                    await redraw.Writer.WriteAsync(true, ct);
                 }
                 break;
 

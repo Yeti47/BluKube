@@ -34,42 +34,59 @@ public sealed class PlayCommand(
         var sessionId = await conn.CreateSessionAsync(ct);
         console.MarkupLine($"[grey]session[/] {sessionId}");
 
-        await using var audio = new AudioPlayer();
-        using var audioCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        var audioTask = Task.Run(async () =>
-        {
-            try { await audio.PlayAsync(conn.StreamAudioAsync(audioCts.Token), audioCts.Token); }
-            catch (OperationCanceledException) { }
-            catch (Exception ex) { console.MarkupLine($"[yellow]audio stopped:[/] {Markup.Escape(ex.Message)}"); }
-        }, audioCts.Token);
+        AudioPlayer? audio = null;
+        CancellationTokenSource? audioCts = null;
+        Task? audioTask = null;
 
-        if (!string.IsNullOrWhiteSpace(s.Query))
+        try
         {
-            var state = await conn.SearchAsync(s.Query, s.Limit, ct);
-            if (state is SearchResultsState results && results.Items.Count > 0)
+            if (!string.IsNullOrWhiteSpace(s.Query))
             {
-                var pick = console.Prompt(new SelectionPrompt<int>()
-                    .Title("Pick a track:")
-                    .AddChoices(Enumerable.Range(0, results.Items.Count))
-                    .UseConverter(i => $"{i + 1}. {Markup.Escape(results.Items[i].Title)} — {Markup.Escape(results.Items[i].Channel)}"));
-                var videoId = ExtractVideoId(results.Items[pick].Url);
-                await conn.PlayAsync(videoId, ct);
+                var state = await conn.SearchAsync(s.Query, s.Limit, ct);
+                if (state is SearchResultsState results && results.Items.Count > 0)
+                {
+                    var pick = console.Prompt(new SelectionPrompt<int>()
+                        .Title("Pick a track:")
+                        .AddChoices(Enumerable.Range(0, results.Items.Count))
+                        .UseConverter(i => $"{i + 1}. {Markup.Escape(results.Items[i].Title)} — {Markup.Escape(results.Items[i].Channel)}"));
+                    var videoId = ExtractVideoId(results.Items[pick].Url);
+                    await conn.PlayAsync(videoId, ct);
+                }
+                else if (state is ErrorState err)
+                {
+                    console.MarkupLine($"[red]error[/] {Markup.Escape(err.Message)}");
+                    return 1;
+                }
             }
-            else if (state is ErrorState err)
+
+            audio = new AudioPlayer();
+            audioCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            audioTask = Task.Run(async () =>
             {
-                console.MarkupLine($"[red]error[/] {Markup.Escape(err.Message)}");
-                return 1;
-            }
+                try { await audio.PlayAsync(conn.StreamAudioAsync(audioCts.Token), audioCts.Token); }
+                catch (OperationCanceledException) { }
+                catch (Exception ex) { console.MarkupLine($"[yellow]audio stopped:[/] {Markup.Escape(ex.Message)}"); }
+            }, audioCts.Token);
+
+            var view = new PlayerView(console, new ConsoleKeyInput(), conn);
+            await view.RunAsync(ct);
         }
+        finally
+        {
+            try { audioCts?.Cancel(); } catch { }
+            if (audioTask is not null)
+            {
+                try { await audioTask; } catch { }
+            }
+            if (audio is not null)
+            {
+                try { await audio.DisposeAsync(); } catch { }
+            }
 
-        var view = new PlayerView(console, new ConsoleKeyInput(), conn);
-        await view.RunAsync(ct);
-
-        try { audioCts.Cancel(); } catch { }
-        try { await audioTask; } catch { }
-
-        try { await conn.CloseSessionAsync(sessionId, CancellationToken.None); }
-        catch { /* best-effort */ }
+            audioCts?.Dispose();
+            try { await conn.CloseSessionAsync(sessionId, CancellationToken.None); }
+            catch { /* best-effort */ }
+        }
         return 0;
     }
 

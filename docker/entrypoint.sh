@@ -19,6 +19,10 @@ if [[ -d "$PA_DIR" ]]; then
   fi
 fi
 
+# Session-scoped Brave profiles are disposable. Remove leftovers from a crash
+# or hard container stop before the server starts accepting new sessions.
+rm -rf /var/lib/blukube/brave-profiles/sessions/* 2>/dev/null || true
+
 # Start PulseAudio in the background. --exit-idle-time=-1 keeps it alive
 # even when no clients are attached, so per-session sinks survive client churn.
 pulseaudio --start --exit-idle-time=-1 --log-target=stderr || {

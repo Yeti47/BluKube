@@ -209,10 +209,10 @@ internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
                         break;
                     }
                 }
-                catch (PlaywrightException) { }
+                catch { }
             }
         }
-        catch (PlaywrightException) { }
+            catch { }
 
         try
         {
@@ -230,7 +230,7 @@ internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
                 }
                 """);
         }
-        catch (PlaywrightException) { }
+        catch { }
     }
 
     private static async Task<bool> TryPlayDomAsync(IPage page)

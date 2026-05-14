@@ -18,23 +18,14 @@ public class SessionHub : Hub<ISessionClient>
 
     public async Task<Guid> CreateSession()
     {
+        if (Context.Items.TryGetValue(SessionIdKey, out var current) && current is Guid currentId)
+        {
+            await _sessionManager.RemoveSessionAsync(currentId);
+        }
+
         var session = await _sessionManager.CreateSessionAsync(Context.ConnectionAborted);
         Context.Items[SessionIdKey] = session.Id;
         return session.Id;
-    }
-
-    public async Task<SessionState> AttachSession(Guid sessionId)
-    {
-        var session = await _sessionManager.GetSessionAsync(sessionId)
-            ?? throw new HubException($"Session {sessionId} not found");
-        Context.Items[SessionIdKey] = session.Id;
-        return session.Current;
-    }
-
-    public Task LeaveSession()
-    {
-        Context.Items.Remove(SessionIdKey);
-        return Task.CompletedTask;
     }
 
     public async Task CloseSession(Guid sessionId)
@@ -94,11 +85,15 @@ public class SessionHub : Hub<ISessionClient>
 
     // --- Connection lifecycle ------------------------------------------------
 
-    public override Task OnDisconnectedAsync(Exception? exception)
+    public override async Task OnDisconnectedAsync(Exception? exception)
     {
-        // Sessions outlive connections; do not destroy on disconnect.
-        // Idle timeout (enforced by SessionManager) handles eventual cleanup.
-        return base.OnDisconnectedAsync(exception);
+        if (Context.Items.TryGetValue(SessionIdKey, out var current) && current is Guid id)
+        {
+            await _sessionManager.RemoveSessionAsync(id);
+            Context.Items.Remove(SessionIdKey);
+        }
+
+        await base.OnDisconnectedAsync(exception);
     }
 
     private async Task<IBrowserSession> RequireSessionAsync()
@@ -108,6 +103,6 @@ public class SessionHub : Hub<ISessionClient>
             var session = await _sessionManager.GetSessionAsync(id);
             if (session is not null) return session;
         }
-        throw new HubException("No session attached to this connection. Call CreateSession or AttachSession first.");
+        throw new HubException("No session attached to this connection. Call CreateSession first.");
     }
 }

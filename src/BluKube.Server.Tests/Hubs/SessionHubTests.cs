@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.SignalR.Client;
+using Microsoft.Extensions.DependencyInjection;
+using BluKube.Server.Core.Session;
 
 namespace BluKube.Server.Tests.Hubs;
 
@@ -49,32 +51,11 @@ public sealed class SessionHubTests : IClassFixture<HubFactory>, IAsyncLifetime
     }
 
     [Fact]
-    public async Task AttachSession_ReturnsCurrentState()
+    public async Task CloseSession_SubsequentCommandThrowsHubException()
     {
         var hub = await ConnectedAsync();
         var id = await hub.InvokeAsync<Guid>("CreateSession");
-
-        // Detach and re-attach from a fresh connection.
-        var hub2 = await ConnectedAsync();
-        var state = await hub2.InvokeAsync<SessionState>("AttachSession", id);
-        Assert.IsType<IdleState>(state);
-    }
-
-    [Fact]
-    public async Task AttachSession_UnknownId_ThrowsHubException()
-    {
-        var hub = await ConnectedAsync();
-        var ex = await Assert.ThrowsAsync<HubException>(
-            () => hub.InvokeAsync<SessionState>("AttachSession", Guid.NewGuid()));
-        Assert.Contains("not found", ex.Message, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public async Task LeaveSession_SubsequentCommandThrowsHubException()
-    {
-        var hub = await ConnectedAsync();
-        await hub.InvokeAsync<Guid>("CreateSession");
-        await hub.InvokeAsync("LeaveSession");
+        await hub.InvokeAsync("CloseSession", id);
 
         var ex = await Assert.ThrowsAsync<HubException>(
             () => hub.InvokeAsync<SessionState>("GetState"));
@@ -82,15 +63,14 @@ public sealed class SessionHubTests : IClassFixture<HubFactory>, IAsyncLifetime
     }
 
     [Fact]
-    public async Task CloseSession_SubsequentAttachThrowsHubException()
+    public async Task Disconnect_RemovesSession()
     {
         var hub = await ConnectedAsync();
         var id = await hub.InvokeAsync<Guid>("CreateSession");
-        await hub.InvokeAsync("CloseSession", id);
+        await hub.DisposeAsync();
 
-        var hub2 = await ConnectedAsync();
-        await Assert.ThrowsAsync<HubException>(
-            () => hub2.InvokeAsync<SessionState>("AttachSession", id));
+        var manager = _factory.Services.GetRequiredService<ISessionManager>();
+        await EventuallyAsync(async () => Assert.Null(await manager.GetSessionAsync(id)));
     }
 
     // ── Commands ──────────────────────────────────────────────────────────────
@@ -252,6 +232,26 @@ public sealed class SessionHubTests : IClassFixture<HubFactory>, IAsyncLifetime
         var hub = await ConnectedAsync();
         await hub.InvokeAsync<Guid>("CreateSession");
         return hub;
+    }
+
+    private static async Task EventuallyAsync(Func<Task> assertion)
+    {
+        Exception? last = null;
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            try
+            {
+                await assertion();
+                return;
+            }
+            catch (Exception ex)
+            {
+                last = ex;
+                await Task.Delay(50);
+            }
+        }
+
+        throw last ?? new TimeoutException("Timed out waiting for assertion.");
     }
 }
 

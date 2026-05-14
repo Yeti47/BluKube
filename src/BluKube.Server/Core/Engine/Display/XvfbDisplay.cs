@@ -6,6 +6,7 @@ public sealed class XvfbDisplay : IDisplay
 {
     private readonly Process _process;
     private readonly FileInfo _socketFile;
+    private bool _disposed;
 
     public string DisplayValue { get; }
     public int DisplayNumber { get; }
@@ -23,6 +24,9 @@ public sealed class XvfbDisplay : IDisplay
 
     public async ValueTask DisposeAsync()
     {
+        if (_disposed) return;
+        _disposed = true;
+
         try
         {
             if (!_process.HasExited)

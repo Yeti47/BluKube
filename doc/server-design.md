@@ -179,26 +179,22 @@ The previous prototype mixed command replies and event ticks on a single channel
 
 Hub methods return `Task` (fire-and-forget) or `Task<SessionState>` for "what does the world look like right after this command". The stream is the source of truth; the reply is a convenience for clients that want a synchronous confirmation.
 
-### Session lifecycle ≠ connection lifecycle
+### Session lifecycle = client lifecycle
 
-A SignalR disconnect must **not** destroy the session. Reattach is a primary feature.
+Each TUI run owns exactly one server session. Starting the client creates a fresh session; closing the client, losing the SignalR connection, or pressing Ctrl+C closes that session and disposes its Brave/Xvfb/audio resources. There is no reattach flow.
 
 ```mermaid
 stateDiagram-v2
     [*] --> Created: CreateSession()
-    Created --> Attached: AttachSession(id)
-    Attached --> Detached: connection drop / LeaveSession()
-    Detached --> Attached: AttachSession(id)
-    Detached --> Closed: idle timeout / CloseSession(id)
-    Attached --> Closed: CloseSession(id)
+    Created --> Closed: client exit / disconnect / CloseSession(id)
     Closed --> [*]
 ```
 
 `SessionManager` enforces:
 
 - `MaxSessions` cap (default 3).
-- Idle timeout (no attached client for N minutes → close).
-- One Brave + Xvfb per session, disposed on close.
+- Idle timeout as a final safety net for any session that is not otherwise closed.
+- One Brave profile + Brave process + Xvfb per session, disposed on close.
 
 ---
 
@@ -216,11 +212,9 @@ public class SessionHub : Hub<ISessionClient>
 {
     // Lifecycle
     public Task<Guid> CreateSession();
-    public Task<SessionState> AttachSession(Guid id);
-    public Task LeaveSession(Guid id);
     public Task CloseSession(Guid id);
 
-    // Commands (all require an attached session on this connection)
+    // Commands (all require the session created on this connection)
     public Task<SessionState> Search(string query, int limit);
     public Task<SessionState> Play(string videoId);
     public Task<SessionState> Pause();
@@ -262,11 +256,6 @@ sequenceDiagram
     Hub->>Sess: SessionManager.Create()
     Sess-->>Hub: id
     Hub-->>TUI: id
-
-    TUI->>Hub: AttachSession(id)
-    Hub->>Sess: subscribe to State stream
-    Sess-->>Hub: current SessionState
-    Hub-->>TUI: SessionState (Idle)
 
     TUI->>Hub: Search("lo-fi beats", 10)
     Hub->>Sess: Search(...)
@@ -460,7 +449,7 @@ Mechanical, low-risk order:
 3. Refactor `IYouTubeBrowser` to expose `OpenSearchAsync` / `OpenWatchAsync`. Delete `IYouTubePage<TParams>` and the `static abstract Create` pattern. Move `YouTubeSearchPage` / `YouTubeWatchPage` behind `ISearchPage` / `IWatchPage`.
 4. Extract `BraveMediaPlayer : IMediaPlayer, IMediaSearch` from the current `BrowserSession`. Move polling into the player with a real, cancellable token.
 5. Reduce `Session` to: hold a `SessionState`, fan out to subscribers via `Channel<SessionState>`, translate `PlaybackEvent` → state updates, delegate commands to player/search.
-6. Split `SessionHub.Connect()` into `CreateSession` / `AttachSession`. Stop killing sessions on disconnect.
+6. Split `SessionHub.Connect()` into `CreateSession` plus typed commands. Close the session on disconnect.
 7. Add `MaxSessions` and idle timeout to `SessionManager`.
 8. Add `FakeMediaPlayer` and the first `Session` unit tests.
 9. Add the first Docker-only `BraveMediaPlayer` test.

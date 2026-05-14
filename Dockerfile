@@ -39,6 +39,9 @@ RUN apt-get update \
 
 ENV BRAVE_EXECUTABLE_PATH=/usr/bin/brave-browser
 
+RUN mkdir -p /etc/brave/policies/managed
+COPY docker/brave-policies.json /etc/brave/policies/managed/blukube.json
+
 RUN useradd --create-home --shell /bin/bash --uid 1001 blukube \
     && mkdir -p /run/user/1001 \
     && chown blukube:blukube /run/user/1001 \

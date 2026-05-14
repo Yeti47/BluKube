@@ -35,8 +35,7 @@ Development is **Docker-first**: the server always runs in a container. VS Code 
 ### Phase 3 — Server: SignalR hub + REST endpoints
 1. **SignalR `SessionHub`** — the primary interactive surface. Hub methods map 1:1 to `IPlayerSession` operations:
    - `CreateSession()` → `{ sessionId }`
-   - `JoinSession(sessionId)` → joins a SignalR group; caller receives `PlayerEvent` stream
-   - `LeaveSession(sessionId)`
+   - `CloseSession(sessionId)` → closes the caller's session and disposes resources
    - `Search(sessionId, query, limit)` → `MediaItem[]`
    - `Play(sessionId, index?)`, `Pause`, `Resume`, `Stop`, `Next`, `Prev`
    - `SeekRelative(sessionId, deltaSeconds)`, `SeekTo(sessionId, seconds)`
@@ -54,11 +53,9 @@ Development is **Docker-first**: the server always runs in a container. VS Code 
 6. CORS: locked off by default; opt-in via env var.
 
 ### Phase 4 — TUI: SignalR client & Spectre.Console TUI
-1. SignalR client using `Microsoft.AspNetCore.SignalR.Client`. Connection lifecycle: connect → login → create/join session.
+1. SignalR client using `Microsoft.AspNetCore.SignalR.Client`. Connection lifecycle: connect → login → create session → close session on exit.
 2. Top-level commands:
-   - `blukube play [query]` — pick/auto-create session, search, pick track, drop into TUI.
-   - `blukube attach [--session <id>]` — reattach TUI for existing session.
-   - `blukube sessions list|new|close <id>` — REST calls to thin endpoints.
+   - `blukube play [query]` — create a fresh session, search, pick track, drop into TUI.
    - `blukube status` — one-shot snapshot via REST.
    - `blukube config set/get` — manage server URL + token.
 3. Login flow: on connect failure (401) TUI prompts for token via Spectre password prompt, stores in `$XDG_CONFIG_HOME/blukube/config.toml`.

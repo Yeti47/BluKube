@@ -60,6 +60,14 @@ public sealed class AudioPlayer : IAsyncDisposable
         al.SourceQueueBuffers(_source, 1, &bufferId);
     }
 
+    private unsafe void UnqueueBuffers(AL al, Span<uint> buffers)
+    {
+        fixed (uint* ids = buffers)
+        {
+            al.SourceUnqueueBuffers(_source, buffers.Length, ids);
+        }
+    }
+
     private unsafe void UploadPcmToBuffer(AL al, uint bufferId, int decodedSamples)
     {
         fixed (short* p = _pcm)
@@ -137,6 +145,17 @@ public sealed class AudioPlayer : IAsyncDisposable
         finally
         {
             try { al.SourceStop(_source); } catch { }
+            try
+            {
+                al.GetSourceProperty(_source, GetSourceInteger.BuffersQueued, out int queued);
+                while (queued > 0)
+                {
+                    var batchSize = Math.Min(queued, buffers.Length);
+                    UnqueueBuffers(al, buffers.AsSpan(0, batchSize));
+                    queued -= batchSize;
+                }
+            }
+            catch { }
             foreach (var b in buffers)
             {
                 try { al.DeleteBuffer(b); } catch { }

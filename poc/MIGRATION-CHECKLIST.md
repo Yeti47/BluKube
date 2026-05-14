@@ -109,8 +109,6 @@ reproduce before the PoC can be retired.
 ## CLI / TUI (new in BluKube)
 
 - [ ] `blukube play [query]` — interactive session flow
-- [ ] `blukube attach [--session <id>]` — reattach TUI
-- [ ] `blukube sessions list|new|close <id>`
 - [ ] `blukube status` — one-shot snapshot
 - [ ] `blukube config set/get`
 - [ ] Login flow on 401 (Spectre password prompt)

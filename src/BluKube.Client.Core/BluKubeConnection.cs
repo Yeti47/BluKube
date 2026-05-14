@@ -50,20 +50,6 @@ public sealed class BluKubeConnection(ConnectionSettings settings) : IAsyncDispo
         return _sessionId.Value;
     }
 
-    public async Task<SessionState> AttachSessionAsync(Guid id, CancellationToken ct = default)
-    {
-        var hub = Require();
-        var state = await hub.InvokeAsync<SessionState>("AttachSession", id, ct);
-        _sessionId = id;
-        return state;
-    }
-
-    public Task LeaveSessionAsync(CancellationToken ct = default)
-    {
-        _sessionId = null;
-        return Require().InvokeAsync("LeaveSession", ct);
-    }
-
     public Task CloseSessionAsync(Guid id, CancellationToken ct = default)
         => Require().InvokeAsync("CloseSession", id, ct);
 

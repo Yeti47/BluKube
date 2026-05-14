@@ -1,0 +1,11 @@
+{
+  "BraveShieldsEnabledForUrls": [
+    "[*.]youtube.com",
+    "https://www.youtube.com"
+  ],
+  "DefaultBraveAdblockSetting": 2,
+  "DefaultBraveFingerprintingV2Setting": 3,
+  "BraveTrackingQueryParametersFilteringEnabled": true,
+  "BraveDebouncingEnabled": true,
+  "BraveDeAmpEnabled": true
+}
