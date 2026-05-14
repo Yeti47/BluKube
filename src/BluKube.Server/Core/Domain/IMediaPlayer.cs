@@ -13,12 +13,6 @@ public interface IMediaPlayer : IAsyncDisposable
     Task<PlayerSnapshot> SeekToAsync(TimeSpan position, CancellationToken ct);
     Task<PlayerSnapshot> SetVolumeAsync(float volume, CancellationToken ct);
 
-    /// <summary>
-    /// Stops playback and releases any current-stream-specific state.
-    /// Safe to call when nothing is playing.
-    /// </summary>
-    Task StopAsync(CancellationToken ct);
-
     IAsyncEnumerable<PlaybackEvent> Events(CancellationToken ct);
 }
 

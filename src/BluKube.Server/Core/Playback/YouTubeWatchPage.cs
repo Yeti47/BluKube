@@ -1,5 +1,7 @@
+using System.Globalization;
 using Microsoft.Playwright;
 using BluKube.Server.Core.Engine.Browser;
+using System.Text.Json;
 
 namespace BluKube.Server.Core.Playback;
 
@@ -7,6 +9,10 @@ internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
 {
     private const int PlaybackRetryDelayMs = 500;
     private const int PlaybackCheckDelayMs = 1200;
+    private const string ActiveVideoExpression =
+                "document.querySelector(\"video.video-stream:not([aria-hidden='true'])\") ?? " +
+                "document.querySelector(\"video.video-stream\") ?? " +
+                "document.querySelector(\"video\")";
 
     private readonly IPage _page = page;
 
@@ -19,12 +25,9 @@ internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
         await DismissConsentAsync(_page);
 
         await _page.WaitForFunctionAsync(
-            """
+            $$"""
             () => {
-              const video =
-                document.querySelector("video.video-stream:not([aria-hidden='true'])") ??
-                document.querySelector("video.video-stream") ??
-                document.querySelector("video");
+              const video = {{ActiveVideoExpression}};
               return !!video;
             }
             """,
@@ -52,17 +55,7 @@ internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
                 return before.ToSnapshot();
             }
 
-            await page.EvaluateAsync(
-                """
-                () => {
-                  const video =
-                    document.querySelector("video.video-stream:not([aria-hidden='true'])") ??
-                    document.querySelector("video.video-stream") ??
-                    document.querySelector("video");
-                  if (!video) return;
-                  video.volume = 1;
-                }
-                """);
+            await EvaluateVideoAsync(page, "video.volume = 1;");
 
             if (await TryPlayDomAsync(page))
             {
@@ -91,17 +84,7 @@ internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
 
     public async Task<WatchSnapshot> PauseAsync(CancellationToken ct)
     {
-        await _page.EvaluateAsync(
-            """
-            () => {
-              const video =
-                document.querySelector("video.video-stream:not([aria-hidden='true'])") ??
-                document.querySelector("video.video-stream") ??
-                document.querySelector("video");
-              if (!video) return;
-              video.pause();
-            }
-            """);
+        await EvaluateVideoAsync(_page, "video.pause();");
         return (await ReadRawAsync()).ToSnapshot();
     }
 
@@ -110,44 +93,23 @@ internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
 
     public async Task<WatchSnapshot> SeekToAsync(TimeSpan position, CancellationToken ct)
     {
-        await _page.EvaluateAsync(
-            $$"""
-            () => {
-              const video =
-                document.querySelector("video.video-stream:not([aria-hidden='true'])") ??
-                document.querySelector("video.video-stream") ??
-                document.querySelector("video");
-              if (!video) return;
-              video.currentTime = {{position.TotalSeconds}};
-            }
-            """);
+        var seconds = position.TotalSeconds.ToString(CultureInfo.InvariantCulture);
+        await EvaluateVideoAsync(_page, $"video.currentTime = {seconds};");
         return (await ReadRawAsync()).ToSnapshot();
     }
 
     public async Task<WatchSnapshot> SetVolumeAsync(float volume, CancellationToken ct)
     {
-        await _page.EvaluateAsync(
-            $$"""
-            () => {
-              const video =
-                document.querySelector("video.video-stream:not([aria-hidden='true'])") ??
-                document.querySelector("video.video-stream") ??
-                document.querySelector("video");
-              if (!video) return;
-              video.volume = {{volume}};
-            }
-            """);
+        var normalized = volume.ToString(CultureInfo.InvariantCulture);
+        await EvaluateVideoAsync(_page, $"video.volume = {normalized};");
         return (await ReadRawAsync()).ToSnapshot();
     }
 
     private Task<RawState> ReadRawAsync() =>
         _page.EvaluateAsync<RawState>(
-            """
+            $$"""
             () => {
-              const video =
-                document.querySelector("video.video-stream:not([aria-hidden='true'])") ??
-                document.querySelector("video.video-stream") ??
-                document.querySelector("video");
+              const video = {{ActiveVideoExpression}};
               const player = document.querySelector('.html5-video-player');
               const adShowing = !!(player && (player.classList.contains('ad-showing') || player.classList.contains('ad-interrupting')));
               const skipBtn = !!document.querySelector('.ytp-ad-skip-button, .ytp-skip-ad-button, .ytp-ad-skip-button-modern');
@@ -176,7 +138,15 @@ internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
             }
             """);
 
-
+    private static Task<JsonElement?> EvaluateVideoAsync(IPage page, string body) =>
+        page.EvaluateAsync(
+            $$"""
+            () => {
+              const video = {{ActiveVideoExpression}};
+              if (!video) return;
+              {{body}}
+            }
+            """);
 
     private static async Task DismissConsentAsync(IPage page)
     {
@@ -212,7 +182,7 @@ internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
                 catch { }
             }
         }
-            catch { }
+        catch { }
 
         try
         {
@@ -238,12 +208,9 @@ internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
         try
         {
             return await page.EvaluateAsync<bool>(
-                """
+                $$"""
                 async () => {
-                  const video =
-                    document.querySelector("video.video-stream:not([aria-hidden='true'])") ??
-                    document.querySelector("video.video-stream") ??
-                    document.querySelector("video");
+                  const video = {{ActiveVideoExpression}};
                   if (!video) return false;
                   document.querySelector('.ytp-ad-skip-button, .ytp-skip-ad-button, .ytp-ad-skip-button-modern')?.click();
                   try { await video.play(); } catch { }
@@ -286,12 +253,9 @@ internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
         try
         {
             var center = await page.EvaluateAsync<VideoCenter?>(
-                """
+                $$"""
                 () => {
-                  const video =
-                    document.querySelector("video.video-stream:not([aria-hidden='true'])") ??
-                    document.querySelector("video.video-stream") ??
-                    document.querySelector("video");
+                  const video = {{ActiveVideoExpression}};
                   if (!video) return null;
                   const rect = video.getBoundingClientRect();
                   return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };

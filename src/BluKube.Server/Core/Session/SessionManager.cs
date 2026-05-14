@@ -45,38 +45,56 @@ public sealed class SessionManager : ISessionManager, IAsyncDisposable
                 $"Session cap reached ({_options.MaxSessions}). Close an existing session and retry.");
         }
 
-        var display = await _displayFactory.CreateAsync(cancellationToken);
+        IDisplay? display = null;
         IAudioOutputDevice? audio = null;
+        IYouTubeBrowser? browser = null;
+
         try
         {
+            display = await _displayFactory.CreateAsync(cancellationToken);
             audio = await _audioFactory.CreateAsync(cancellationToken);
+            browser = await _browserLauncher.LaunchAsync(display, audio.SinkName, cancellationToken);
+
+            var player = new BraveMediaPlayer(display, browser);
+            display = null;
+            browser = null;
+
+            var session = new BrowserSession(player, player, audio);
+            audio = null;
+
+            if (!_sessions.TryAdd(session.Id, session))
+            {
+                await session.DisposeAsync();
+                throw new InvalidOperationException("Failed to add session to manager");
+            }
+
+            // Re-check cap under contention; if we slipped over, drop this one.
+            if (_sessions.Count > _options.MaxSessions)
+            {
+                _sessions.TryRemove(session.Id, out _);
+                await session.DisposeAsync();
+                throw new InvalidOperationException(
+                    $"Session cap reached ({_options.MaxSessions}). Close an existing session and retry.");
+            }
+
+            return session;
         }
-        catch (Exception ex)
+        catch
         {
-            _logger.LogWarning(ex, "Audio output device creation failed; session will have no audio stream");
+            if (browser is not null)
+            {
+                try { await browser.DisposeAsync(); } catch { }
+            }
+            if (audio is not null)
+            {
+                try { await audio.DisposeAsync(); } catch { }
+            }
+            if (display is not null)
+            {
+                try { await display.DisposeAsync(); } catch { }
+            }
+            throw;
         }
-
-        var browser = await _browserLauncher.LaunchAsync(display, audio?.SinkName, cancellationToken);
-
-        var player = new BraveMediaPlayer(display, browser);
-        var session = new BrowserSession(player, player, audio);
-
-        if (!_sessions.TryAdd(session.Id, session))
-        {
-            await session.DisposeAsync();
-            throw new InvalidOperationException("Failed to add session to manager");
-        }
-
-        // Re-check cap under contention; if we slipped over, drop this one.
-        if (_sessions.Count > _options.MaxSessions)
-        {
-            _sessions.TryRemove(session.Id, out _);
-            await session.DisposeAsync();
-            throw new InvalidOperationException(
-                $"Session cap reached ({_options.MaxSessions}). Close an existing session and retry.");
-        }
-
-        return session;
     }
 
     public Task<IBrowserSession?> GetSessionAsync(Guid sessionId)

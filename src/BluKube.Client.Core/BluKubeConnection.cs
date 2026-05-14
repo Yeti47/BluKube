@@ -6,11 +6,6 @@ namespace BluKube.Client.Core;
 /// Strongly-typed wrapper around the BluKube <c>SessionHub</c> connection.
 /// Owns one <see cref="HubConnection"/> bound to one session at a time.
 /// </summary>
-/// <remarks>
-/// The connection is created lazily on <see cref="ConnectAsync"/>; callers
-/// must call <see cref="DisposeAsync"/> when done. Use
-/// <see cref="OnState"/> to observe pushed state updates from the server.
-/// </remarks>
 public sealed class BluKubeConnection(ConnectionSettings settings) : IAsyncDisposable
 {
     private HubConnection? _hub;
@@ -18,9 +13,6 @@ public sealed class BluKubeConnection(ConnectionSettings settings) : IAsyncDispo
 
     public Guid? SessionId => _sessionId;
     public HubConnectionState State => _hub?.State ?? HubConnectionState.Disconnected;
-
-    /// <summary>Raised whenever the server pushes a new state.</summary>
-    public event Action<SessionState>? OnState;
 
     public async Task ConnectAsync(CancellationToken ct = default)
     {
@@ -36,8 +28,6 @@ public sealed class BluKubeConnection(ConnectionSettings settings) : IAsyncDispo
             })
             .WithAutomaticReconnect()
             .Build();
-
-        hub.On<SessionState>("State", s => OnState?.Invoke(s));
 
         await hub.StartAsync(ct);
         _hub = hub;

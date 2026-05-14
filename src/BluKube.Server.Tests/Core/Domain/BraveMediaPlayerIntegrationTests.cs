@@ -18,7 +18,7 @@ public sealed class BraveMediaPlayerIntegrationTests
     private const string SampleVideoId = "YE7VzlLtp-4";
 
     [DockerOnlyFact]
-    public async Task PlayAndStop_DrivesPlayerThroughLifecycle()
+    public async Task PlayAndPause_DrivesPlayerThroughLifecycle()
     {
         await using var display = await new XvfbDisplayFactory().CreateAsync(CancellationToken.None);
         await using var browser = await new BraveYouTubeBrowserLauncher()
@@ -35,6 +35,5 @@ public sealed class BraveMediaPlayerIntegrationTests
         var paused = await player.PauseAsync(cts.Token);
         Assert.False(paused.IsPlaying);
 
-        await player.StopAsync(cts.Token);
     }
 }

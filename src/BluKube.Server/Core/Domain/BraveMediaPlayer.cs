@@ -26,12 +26,14 @@ public sealed class BraveMediaPlayer(IDisplay display, IYouTubeBrowser browser) 
     private CancellationTokenSource? _pollCts;
     private Task? _pollTask;
     private int _userPaused;
+    private int _disposed;
 
     public async Task<IReadOnlyList<MediaItem>> SearchAsync(string query, int limit, CancellationToken ct)
     {
         await _gate.WaitAsync(ct);
         try
         {
+            ThrowIfDisposed();
             await StopPollingAsync();
             _currentWatch = null;
             _currentVideoId = null;
@@ -50,6 +52,7 @@ public sealed class BraveMediaPlayer(IDisplay display, IYouTubeBrowser browser) 
         await _gate.WaitAsync(ct);
         try
         {
+            ThrowIfDisposed();
             await StopPollingAsync();
 
             var watch = await browser.OpenWatchAsync(videoId, ct);
@@ -93,25 +96,6 @@ public sealed class BraveMediaPlayer(IDisplay display, IYouTubeBrowser browser) 
         => OnWatch(async (watch, linkedCt) =>
             (await watch.SetVolumeAsync(Math.Clamp(volume, 0f, 1f), linkedCt)).ToPlayerSnapshot(_currentVideoId ?? string.Empty), ct);
 
-    public async Task StopAsync(CancellationToken ct)
-    {
-        await _gate.WaitAsync(ct);
-        try
-        {
-            await StopPollingAsync();
-            if (_currentWatch is { } watch)
-            {
-                try { await watch.PauseAsync(ct); } catch { }
-            }
-            _currentWatch = null;
-            _currentVideoId = null;
-        }
-        finally
-        {
-            _gate.Release();
-        }
-    }
-
     public async IAsyncEnumerable<PlaybackEvent> Events(
         [EnumeratorCancellation] CancellationToken ct)
     {
@@ -144,6 +128,7 @@ public sealed class BraveMediaPlayer(IDisplay display, IYouTubeBrowser browser) 
         await _gate.WaitAsync(ct);
         try
         {
+            ThrowIfDisposed();
             if (_currentWatch is not { } watch)
             {
                 throw new InvalidOperationException("No active playback.");
@@ -158,6 +143,7 @@ public sealed class BraveMediaPlayer(IDisplay display, IYouTubeBrowser browser) 
 
     private void StartPolling()
     {
+        if (Volatile.Read(ref _disposed) == 1) return;
         if (_pollTask is { IsCompleted: false }) return;
 
         var cts = CancellationTokenSource.CreateLinkedTokenSource(_disposeCts.Token);
@@ -226,21 +212,39 @@ public sealed class BraveMediaPlayer(IDisplay display, IYouTubeBrowser browser) 
         }
     }
 
+    private void ThrowIfDisposed()
+    {
+        if (Volatile.Read(ref _disposed) == 1)
+        {
+            throw new ObjectDisposedException(nameof(BraveMediaPlayer));
+        }
+    }
+
     public async ValueTask DisposeAsync()
     {
-        await StopPollingAsync();
-        try { _disposeCts.Cancel(); } catch { }
+        if (Interlocked.Exchange(ref _disposed, 1) == 1) return;
 
-        foreach (var sub in _subscribers.Values)
+        await _gate.WaitAsync();
+        try
         {
-            sub.Writer.TryComplete();
+            await StopPollingAsync();
+            try { _disposeCts.Cancel(); } catch { }
+
+            foreach (var sub in _subscribers.Values)
+            {
+                sub.Writer.TryComplete();
+            }
+            _subscribers.Clear();
+
+            try { await browser.DisposeAsync(); } catch { }
+            try { await display.DisposeAsync(); } catch { }
+
+            _disposeCts.Dispose();
         }
-        _subscribers.Clear();
-
-        try { await browser.DisposeAsync(); } catch { }
-        try { await display.DisposeAsync(); } catch { }
-
-        _disposeCts.Dispose();
-        _gate.Dispose();
+        finally
+        {
+            _gate.Release();
+            _gate.Dispose();
+        }
     }
 }

@@ -4,7 +4,7 @@ using BluKube.Server.Core.Session;
 
 namespace BluKube.Server.Hubs;
 
-public class SessionHub : Hub<ISessionClient>
+public class SessionHub : Hub
 {
     private readonly ISessionManager _sessionManager;
     private const string SessionIdKey = "SessionId";
@@ -30,12 +30,15 @@ public class SessionHub : Hub<ISessionClient>
 
     public async Task CloseSession(Guid sessionId)
     {
-        await _sessionManager.RemoveSessionAsync(sessionId);
-        if (Context.Items.TryGetValue(SessionIdKey, out var current)
-            && current is Guid id && id == sessionId)
+        if (!Context.Items.TryGetValue(SessionIdKey, out var current)
+            || current is not Guid id
+            || id != sessionId)
         {
-            Context.Items.Remove(SessionIdKey);
+            throw new HubException("Session is not attached to this connection.");
         }
+
+        await _sessionManager.RemoveSessionAsync(sessionId);
+        Context.Items.Remove(SessionIdKey);
     }
 
     // --- Commands ------------------------------------------------------------

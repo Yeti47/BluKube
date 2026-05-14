@@ -63,6 +63,25 @@ public sealed class SessionHubTests : IClassFixture<HubFactory>, IAsyncLifetime
     }
 
     [Fact]
+    public async Task CloseSession_ForDifferentSession_ThrowsAndKeepsOwnSession()
+    {
+        var first = await SessionAsync();
+        var ownId = await first.InvokeAsync<Guid>("CreateSession");
+        var second = await SessionAsync();
+        var otherId = await second.InvokeAsync<Guid>("CreateSession");
+
+        var ex = await Assert.ThrowsAsync<HubException>(
+            () => first.InvokeAsync("CloseSession", otherId));
+
+        Assert.Contains("not attached", ex.Message);
+        Assert.IsType<IdleState>(await first.InvokeAsync<SessionState>("GetState"));
+
+        var manager = _factory.Services.GetRequiredService<ISessionManager>();
+        Assert.NotNull(await manager.GetSessionAsync(ownId));
+        Assert.NotNull(await manager.GetSessionAsync(otherId));
+    }
+
+    [Fact]
     public async Task Disconnect_RemovesSession()
     {
         var hub = await ConnectedAsync();

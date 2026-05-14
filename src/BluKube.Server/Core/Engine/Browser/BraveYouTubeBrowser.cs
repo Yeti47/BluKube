@@ -9,7 +9,7 @@ public sealed class BraveYouTubeBrowser(
     IPage page,
     IBrowserContext context,
     IPlaywright playwright,
-    string profilePath) : IYouTubeBrowser
+    BraveProfileLease profile) : IYouTubeBrowser
 {
     private readonly IPage _page = page;
     private bool _disposed;
@@ -35,29 +35,6 @@ public sealed class BraveYouTubeBrowser(
 
         try { await context.CloseAsync(); } catch { }
         playwright.Dispose();
-        await DeleteProfileAsync(profilePath);
-    }
-
-    private static async Task DeleteProfileAsync(string path)
-    {
-        for (var attempt = 0; attempt < 5; attempt++)
-        {
-            try
-            {
-                if (Directory.Exists(path))
-                {
-                    Directory.Delete(path, recursive: true);
-                }
-                return;
-            }
-            catch when (attempt < 4)
-            {
-                await Task.Delay(100);
-            }
-            catch
-            {
-                return;
-            }
-        }
+        await profile.DisposeAsync();
     }
 }
