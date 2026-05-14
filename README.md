@@ -1,103 +1,200 @@
-# yt-cli-radio → BluKube
+# BluKube
 
-> **Status:** mid-refactor. The legacy PoC lives under [`poc/`](poc/); the new **BluKube** server/client implementation is under construction. See [`doc/refactor-plan.md`](doc/refactor-plan.md) for the full plan.
+BluKube is a self-hosted YouTube audio player. It lets you run the playback workload on a server and control it from a terminal or browser UI.
 
----
+Use it when you want a lightweight, private radio-like player without keeping a full YouTube browser tab open on the client machine.
 
-# yt-cli-radio (PoC)
+Playback is driven by Brave on the server side, including Brave Shields for built-in ad-blocking.
 
-Interactive YouTube radio CLI using **.NET 10**, **headless Brave**, and Playwright automation.
+BluKube includes a Docker-first server, a native terminal client, and a Blazor web client.
 
-This project is currently MVP-first and intentionally constrained to browser-native playback in Brave.
+## Components
 
-## Prerequisites
+### `BluKube.Server`
 
-- .NET SDK 10.0+
-- Brave browser installed locally, or provide `--brave-path`
-- `Xvfb` on PATH (Fedora: `sudo dnf install xorg-x11-server-Xvfb`,
-  Debian/Ubuntu: `sudo apt-get install xvfb`)
+ASP.NET Core server with:
 
-> **Why Xvfb?** Brave is launched in headed mode so its Shields
-> (ad/cookie-consent blocking) and the Chromium audio pipeline both stay
-> fully functional — neither works reliably in headless mode on Linux. The
-> app starts its own private Xvfb display, so no window ever appears on your
-> real screen even if your session has `DISPLAY` set.
+- SignalR hub at `/hubs/session`
+- health endpoints at `/health` and `/alive`
+- session management and browser lifecycle
+- ad-blocking during playback via Brave Shields
+- bearer-token authentication
 
-## Run locally
+By default the server binds to `127.0.0.1:8765` outside development. In the container it is configured to bind to `0.0.0.0:8765`.
 
-```bash
-dotnet restore YtCliRadio.slnx
-dotnet run --project src/YtCliRadio -- --query "lofi hip hop" --limit 8
-```
+### `BluKube.Tui`
 
-Dry-run (search + selection only, does not start Brave or Xvfb):
+A Spectre.Console terminal UI that connects to the server, renders the live player/search experience, and stores config in:
 
-```bash
-dotnet run --project src/YtCliRadio -- --query "synthwave" --dry-run
-```
+- `$XDG_CONFIG_HOME/blukube/config.json`, or
+- `~/.config/blukube/config.json`
 
-Interactive radio mode controls during playback:
+### `BluKube.Web`
 
-- `Space`: pause/resume
-- `N`: next track in current queue
-- `R`: start a new search and build a new queue
-- `Q`: quit
+A Blazor Server client that renders the shared TUI output inside xterm.js and stores config in browser `localStorage`.
 
-## CLI options
+On first load it prompts for:
+
+- server URL
+- auth token
+
+After that it reconnects directly into the terminal view until you log out / clear the saved config.
+
+## How It Works
 
 ```text
-Usage:
-  dotnet run --project src/YtCliRadio -- [options]
-
-Options:
-  -q|--query <text>      Search term (default: "lofi hip hop")
-  -n|--limit <number>    Number of search results (1-20, default: 8)
-     --dry-run           Search only, do not launch playback
-     --brave-path <path> Override Brave executable path
-  -h|--help              Show help
+YouTube in Brave -> PulseAudio capture -> Opus stream -> BluKube client
+                       ^                         |
+                       |                         v
+                 Playwright automation <- SignalR commands
 ```
 
-## Docker
+More concretely:
 
-Build:
+1. A client connects to `BluKube.Server`.
+2. The server creates an isolated browser session.
+3. Search/play/pause/seek/volume commands go to the session hub.
+4. The server automates YouTube in Brave with Shields enabled for ad-blocking.
+5. Audio is captured from the browser session and streamed to the client.
+6. State snapshots are streamed alongside audio so the UI stays live.
+
+## Releases
+
+If you want to use BluKube without building it yourself, start with the [GitHub releases page](https://github.com/Yeti47/yt-cli-radio/releases).
+
+Releases provide:
+
+- pre-built Docker images for the server components
+- a pre-built TUI binary
+- setup and usage notes for the packaged artifacts
+
+## Quick Start From Source
+
+### 1. Start the server
+
+The easiest path is Docker Compose:
 
 ```bash
-docker build -t yt-cli-radio .
+docker compose build
+BLUKUBE_TOKEN=replace-me docker compose up -d
 ```
 
-Run (with audio routed to host PulseAudio / PipeWire):
+The server listens on port `8765` by default.
+
+If you do not provide `BLUKUBE_TOKEN`, the server generates a random token on first startup and persists it to `/var/lib/blukube/token` inside the container.
+
+To inspect that generated token:
 
 ```bash
-docker run --rm -it \
-  --user $(id -u):$(id -g) \
-  -e HOME=/tmp \
-  -e XDG_RUNTIME_DIR=/run/user/$(id -u) \
-  -e PULSE_SERVER=unix:/run/user/$(id -u)/pulse/native \
-  -e PULSE_COOKIE=/tmp/pulse-cookie \
-  -v /run/user/$(id -u)/pulse/native:/run/user/$(id -u)/pulse/native \
-  -v ~/.config/pulse/cookie:/tmp/pulse-cookie:ro \
-  -v /etc/machine-id:/etc/machine-id:ro \
-  yt-cli-radio --query "lofi mix"
+docker exec blukube cat /var/lib/blukube/token
 ```
 
-Notes:
-- `--user $(id -u):$(id -g)` makes the host PulseAudio socket readable from inside the container.
-- `HOME=/tmp` is required because the baked-in `appuser` home is not writable by an arbitrary UID; Brave needs a writable `$HOME` for its profile.
-- `XDG_RUNTIME_DIR` is required so the PulseAudio client library can locate its cookie alongside the socket.
-- `PULSE_COOKIE` + the cookie bind mount provide the per-user authentication token PulseAudio requires on top of the socket connection. Without it Brave connects but is rejected and silently produces no audio.
-- On PipeWire-only systems the same socket path works via `pipewire-pulse`; the cookie is still consulted.
-- If you only want to validate search without audio, append `--dry-run` and you can drop the audio mounts/env.
+### 2. Connect with the TUI
 
-For interactive playback controls in Docker, keep `-it` and omit `--dry-run`.
+Build a local release binary:
 
-Troubleshooting:
+```bash
+dotnet publish src/BluKube.Tui/BluKube.Tui.csproj -c Release -o publish/tui
+```
 
-- If local search times out waiting for YouTube elements, retry once; the app now navigates directly to `/results` and applies a consent cookie to reduce first-load consent interruptions.
-- If Docker reports Playwright node permission errors, rebuild the image with `--no-cache` so the updated executable permissions in `/app/.playwright` are applied.
-- `Xvfb is required for invisible playback but was not found on PATH` — install it (see Prerequisites).
-- No audio: confirm the host PulseAudio/PipeWire socket is reachable. Locally `pactl info` should succeed in the same shell. In Docker, see the audio mount in the Docker section.
+Run it:
+
+```bash
+./publish/tui/blukube
+```
+
+On first run, the TUI prompts for:
+
+- `Server URL` (typically `http://127.0.0.1:8765`)
+- `Auth token`
+
+You can inspect or clear saved TUI config with:
+
+```bash
+./publish/tui/blukube config --show
+./publish/tui/blukube config --clear
+```
+
+### 3. Connect with the web client
+
+Run the web client locally:
+
+```bash
+dotnet run --project src/BluKube.Web/BluKube.Web.csproj
+```
+
+Then open the URL shown by ASP.NET Core, enter:
+
+- the BluKube server URL
+- the auth token
+
+The web client stores both values in browser `localStorage`.
+
+## Docker Images
+
+The repository contains two Dockerfiles:
+
+- [Dockerfile](Dockerfile) for `BluKube.Server`
+- [Dockerfile.web](Dockerfile.web) for `BluKube.Web`
+
+Build them locally with:
+
+```bash
+docker build -t blukube-server .
+docker build -f Dockerfile.web -t blukube-web .
+```
+
+Run them with:
+
+```bash
+docker run --rm -p 8765:8765 -e BLUKUBE_TOKEN=replace-me blukube-server
+docker run --rm -p 8080:8080 blukube-web
+```
+
+The web client container serves only the Blazor client. You still need a running BluKube server and must enter its URL/token in the app.
+
+## Local Development
+
+Useful commands for the current tree:
+
+```bash
+dotnet build BluKube.slnx
+set +H && dotnet test BluKube.slnx --filter 'FullyQualifiedName!~BraveMediaPlayerIntegrationTests'
+dotnet publish src/BluKube.Tui/BluKube.Tui.csproj -c Release -o publish/tui
+docker compose build && BLUKUBE_TOKEN=replace-me docker compose up -d
+```
+
+If you want only the server build:
+
+```bash
+dotnet build src/BluKube.Server/BluKube.Server.csproj
+```
+
+## Authentication
+
+BluKube uses a single bearer token shared by clients.
+
+The server resolves that token in this order:
+
+1. `BLUKUBE_TOKEN`
+2. `BLUKUBE_TOKEN_FILE`
+3. generated token persisted to the configured token file
+
+Clients do not manage accounts or sessions independently. They simply store the server URL and bearer token locally.
+
+## Project Layout
+
+- [src/BluKube.Server](src/BluKube.Server) - server, browser automation, audio capture, session hub
+- [src/BluKube.Tui](src/BluKube.Tui) - terminal client
+- [src/BluKube.Web](src/BluKube.Web) - Blazor web client
+- [src/BluKube.Contracts](src/BluKube.Contracts) - shared wire contracts
+- [src/BluKube.Client.Core](src/BluKube.Client.Core) - shared client connection/audio code
+- [src/BluKube.Tui.Rendering](src/BluKube.Tui.Rendering) - shared TUI rendering and controller logic
+
 ## Notes
 
-- MVP keeps playback browser-native in headless Brave only.
-- YouTube page structure can change; selectors may need maintenance.
-- Ensure usage complies with applicable YouTube terms and local laws.
+- The server is designed to be Docker-first.
+- The web client is a remote UI, not a replacement for the server.
+- YouTube behavior changes over time; selectors and player automation may need maintenance.
+- This project and its authors are not affiliated with, endorsed by, or associated with YouTube.
+- Use BluKube only in compliance with YouTube's terms of service.

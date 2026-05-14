@@ -8,18 +8,15 @@ COPY src/BluKube.Tui.Rendering/BluKube.Tui.Rendering.csproj src/BluKube.Tui.Rend
 COPY src/BluKube.Server/BluKube.Server.csproj src/BluKube.Server/
 COPY src/BluKube.Tui/BluKube.Tui.csproj src/BluKube.Tui/
 COPY src/BluKube.Server.Tests/BluKube.Server.Tests.csproj src/BluKube.Server.Tests/
-COPY src/BluKube.Tui.Tests/BluKube.Tui.Tests.csproj src/BluKube.Tui.Tests/
 RUN dotnet restore src/BluKube.Server/BluKube.Server.csproj \
-    && dotnet restore src/BluKube.Server.Tests/BluKube.Server.Tests.csproj \
-    && dotnet restore src/BluKube.Tui.Tests/BluKube.Tui.Tests.csproj
+    && dotnet restore src/BluKube.Server.Tests/BluKube.Server.Tests.csproj
 
 RUN apt-get update && apt-get install -y --no-install-recommends xvfb && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY . .
 RUN dotnet publish src/BluKube.Server/BluKube.Server.csproj -c Release -o /app/publish --no-restore
 # Brave is only installed in the runtime stage, so skip tests that launch it during build.
-RUN dotnet test src/BluKube.Server.Tests/BluKube.Server.Tests.csproj --no-restore --filter "FullyQualifiedName!~BraveMediaPlayerIntegrationTests" \
-    && dotnet test src/BluKube.Tui.Tests/BluKube.Tui.Tests.csproj --no-restore
+RUN dotnet test src/BluKube.Server.Tests/BluKube.Server.Tests.csproj --no-restore --filter "FullyQualifiedName!~BraveMediaPlayerIntegrationTests"
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app

@@ -7,6 +7,5 @@
     <Project Path="src/BluKube.Tui/BluKube.Tui.csproj" />
     <Project Path="src/BluKube.Web/BluKube.Web.csproj" />
     <Project Path="src/BluKube.Server.Tests/BluKube.Server.Tests.csproj" />
-    <Project Path="src/BluKube.Tui.Tests/BluKube.Tui.Tests.csproj" />
   </Folder>
 </Solution>
