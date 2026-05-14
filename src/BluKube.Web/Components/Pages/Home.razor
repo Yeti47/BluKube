@@ -31,7 +31,7 @@ else if (_mode == AppMode.Setup)
         {
             <p class="error">@_setupError</p>
         }
-        <button type="submit" disabled="@string.IsNullOrWhiteSpace(_serverUrl) || string.IsNullOrWhiteSpace(_token)">
+        <button type="submit" disabled="@(!CanConnect)">
             Connect
         </button>
     </form>
@@ -67,6 +67,8 @@ else
     private string  _serverUrl  = string.Empty;
     private string  _token      = string.Empty;
     private string? _setupError;
+    private bool CanConnect =>
+        !string.IsNullOrWhiteSpace(_serverUrl) && !string.IsNullOrWhiteSpace(_token);
 
     // ── xterm bridge ────────────────────────────────────────────────────────
     private readonly XtermWriter   _writer   = new();
