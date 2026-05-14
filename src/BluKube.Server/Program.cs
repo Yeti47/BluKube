@@ -79,7 +79,7 @@ builder.Services.AddSingleton<ISessionManager, SessionManager>();
 var app = builder.Build();
 
 // Force token resolution on startup so failures surface immediately.
-_ = app.Services.GetRequiredService<AuthTokenProvider>();
+_ = app.Services.GetRequiredService<AuthTokenProvider>().Token;
 
 if (corsOrigins.Length > 0)
 {

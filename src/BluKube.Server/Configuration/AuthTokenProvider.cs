@@ -9,19 +9,19 @@ namespace BluKube.Server.Configuration;
 /// if missing, generates and persists) the token at
 /// <see cref="AuthOptions.TokenFile"/>.
 /// </summary>
-public sealed class AuthTokenProvider
+public sealed class AuthTokenProvider(IOptions<AuthOptions> options, ILogger<AuthTokenProvider> logger)
 {
-    public string Token { get; }
+    private readonly Lazy<string> _token = new(() => ResolveToken(options.Value, logger));
 
-    public AuthTokenProvider(IOptions<AuthOptions> options, ILogger<AuthTokenProvider> logger)
+    public string Token => _token.Value;
+
+    private static string ResolveToken(AuthOptions opts, ILogger<AuthTokenProvider> logger)
     {
-        var opts = options.Value;
-
         if (!string.IsNullOrWhiteSpace(opts.Token))
         {
-            Token = opts.Token.Trim();
+            var configured = opts.Token.Trim();
             logger.LogInformation("Auth token loaded from configuration.");
-            return;
+            return configured;
         }
 
         var file = opts.TokenFile;
@@ -30,9 +30,8 @@ public sealed class AuthTokenProvider
             var existing = File.ReadAllText(file).Trim();
             if (!string.IsNullOrWhiteSpace(existing))
             {
-                Token = existing;
                 logger.LogInformation("Auth token loaded from {File}.", file);
-                return;
+                return existing;
             }
         }
 
@@ -58,6 +57,6 @@ public sealed class AuthTokenProvider
                 "Using an in-memory token (will rotate on restart).", file);
         }
 
-        Token = generated;
+        return generated;
     }
 }
