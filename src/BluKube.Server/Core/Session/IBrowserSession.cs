@@ -19,6 +19,7 @@ public interface IBrowserSession : IAsyncDisposable
 
     Task<SessionState> SearchAsync(string query, int limit, CancellationToken ct = default);
     Task<SessionState> PlayAsync(string videoId, CancellationToken ct = default);
+    Task<SessionState> StopAsync(CancellationToken ct = default);
     Task<SessionState> PauseAsync(CancellationToken ct = default);
     Task<SessionState> ResumeAsync(CancellationToken ct = default);
     Task<SessionState> SeekToAsync(TimeSpan position, CancellationToken ct = default);

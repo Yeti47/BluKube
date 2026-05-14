@@ -70,6 +70,27 @@ public sealed class BraveMediaPlayer(IDisplay display, IYouTubeBrowser browser) 
         }
     }
 
+    public async Task StopAsync(CancellationToken ct)
+    {
+        await _gate.WaitAsync(ct);
+        try
+        {
+            ThrowIfDisposed();
+            await StopPollingAsync();
+            if (_currentWatch is { } watch)
+            {
+                try { await watch.PauseAsync(ct); }
+                catch { /* best-effort: we're stopping regardless */ }
+            }
+            _currentWatch = null;
+            _currentVideoId = null;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
     public Task<PlayerSnapshot> PauseAsync(CancellationToken ct)
         => OnWatch(async (watch, linkedCt) =>
         {

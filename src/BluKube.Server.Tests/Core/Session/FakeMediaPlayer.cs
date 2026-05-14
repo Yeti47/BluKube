@@ -50,6 +50,13 @@ internal sealed class FakeMediaPlayer : IMediaPlayer, IMediaSearch
         return Task.FromResult(NextSnapshot);
     }
 
+    public Task StopAsync(CancellationToken ct)
+    {
+        Commands.Add("stop");
+        ThrowIfPending();
+        return Task.CompletedTask;
+    }
+
     public Task<PlayerSnapshot> PauseAsync(CancellationToken ct)
     {
         Commands.Add("pause");

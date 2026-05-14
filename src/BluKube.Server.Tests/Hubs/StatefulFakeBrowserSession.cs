@@ -30,6 +30,12 @@ internal sealed class StatefulFakeBrowserSession : IBrowserSession
     public Task<SessionState> PlayAsync(string videoId, CancellationToken ct = default)
         => Task.FromResult(Transition(new PlaybackState(videoId, TimeSpan.Zero, TimeSpan.FromMinutes(3), true, 1f)));
 
+    public Task<SessionState> StopAsync(CancellationToken ct = default)
+    {
+        Current = new IdleState();
+        return Task.FromResult(Current);
+    }
+
     public Task<SessionState> PauseAsync(CancellationToken ct = default)
         => Task.FromResult(Current is PlaybackState pb ? Transition(pb with { IsPlaying = false }) : Current);
 

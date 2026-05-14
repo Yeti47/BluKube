@@ -54,6 +54,13 @@ public sealed class BrowserSession : IBrowserSession
         => RunAsync("play_failed", async linkedCt =>
             (SessionState)ToPlaybackState(await _player.PlayAsync(videoId, linkedCt)), ct);
 
+    public Task<SessionState> StopAsync(CancellationToken ct = default)
+        => RunAsync("stop_failed", async linkedCt =>
+        {
+            await _player.StopAsync(linkedCt);
+            return (SessionState)new IdleState();
+        }, ct);
+
     public Task<SessionState> PauseAsync(CancellationToken ct = default)
         => RunAsync("pause_failed", async linkedCt =>
             (SessionState)ToPlaybackState(await _player.PauseAsync(linkedCt)), ct);

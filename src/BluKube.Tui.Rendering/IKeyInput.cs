@@ -22,12 +22,11 @@ public enum Key
     Char,
     Space,
     Enter,
+    Backspace,
     Escape,
     LeftArrow,
     RightArrow,
     UpArrow,
     DownArrow,
-    Plus,
-    Minus,
     Q,
 }

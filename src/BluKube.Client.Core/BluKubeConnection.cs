@@ -51,6 +51,9 @@ public sealed class BluKubeConnection(ConnectionSettings settings) : IAsyncDispo
     public Task<SessionState> PlayAsync(string videoId, CancellationToken ct = default)
         => Require().InvokeAsync<SessionState>("Play", videoId, ct);
 
+    public Task<SessionState> StopAsync(CancellationToken ct = default)
+        => Require().InvokeAsync<SessionState>("Stop", ct);
+
     public Task<SessionState> PauseAsync(CancellationToken ct = default)
         => Require().InvokeAsync<SessionState>("Pause", ct);
 

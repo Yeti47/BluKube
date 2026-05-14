@@ -8,6 +8,7 @@ namespace BluKube.Server.Core.Domain;
 public interface IMediaPlayer : IAsyncDisposable
 {
     Task<PlayerSnapshot> PlayAsync(string videoId, CancellationToken ct);
+    Task StopAsync(CancellationToken ct);
     Task<PlayerSnapshot> PauseAsync(CancellationToken ct);
     Task<PlayerSnapshot> ResumeAsync(CancellationToken ct);
     Task<PlayerSnapshot> SeekToAsync(TimeSpan position, CancellationToken ct);

@@ -17,7 +17,7 @@ public sealed class PlayCommand(
     public sealed class Settings : GlobalSettings
     {
         [CommandArgument(0, "[query]")]
-        [Description("Optional search query. Omit to drop straight into the player.")]
+        [Description("Optional initial search query.")]
         public string? Query { get; init; }
 
         [CommandOption("--limit <N>")]
@@ -32,7 +32,6 @@ public sealed class PlayCommand(
         await conn.ConnectAsync(ct);
 
         var sessionId = await conn.CreateSessionAsync(ct);
-        console.MarkupLine($"[grey]session[/] {sessionId}");
 
         AudioPlayer? audio = null;
         CancellationTokenSource? audioCts = null;
@@ -40,25 +39,6 @@ public sealed class PlayCommand(
 
         try
         {
-            if (!string.IsNullOrWhiteSpace(s.Query))
-            {
-                var state = await conn.SearchAsync(s.Query, s.Limit, ct);
-                if (state is SearchResultsState results && results.Items.Count > 0)
-                {
-                    var pick = console.Prompt(new SelectionPrompt<int>()
-                        .Title("Pick a track:")
-                        .AddChoices(Enumerable.Range(0, results.Items.Count))
-                        .UseConverter(i => $"{i + 1}. {Markup.Escape(results.Items[i].Title)} — {Markup.Escape(results.Items[i].Channel)}"));
-                    var videoId = ExtractVideoId(results.Items[pick].Url);
-                    await conn.PlayAsync(videoId, ct);
-                }
-                else if (state is ErrorState err)
-                {
-                    console.MarkupLine($"[red]error[/] {Markup.Escape(err.Message)}");
-                    return 1;
-                }
-            }
-
             audio = new AudioPlayer();
             audioCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             audioTask = Task.Run(async () =>
@@ -68,7 +48,7 @@ public sealed class PlayCommand(
                 catch (Exception ex) { console.MarkupLine($"[yellow]audio stopped:[/] {Markup.Escape(ex.Message)}"); }
             }, audioCts.Token);
 
-            var view = new PlayerView(console, new ConsoleKeyInput(), conn);
+            var view = new PlayerView(console, new ConsoleKeyInput(), conn, s.Query, s.Limit);
             await view.RunAsync(ct);
         }
         finally
@@ -88,17 +68,5 @@ public sealed class PlayCommand(
             catch { /* best-effort */ }
         }
         return 0;
-    }
-
-    private static string ExtractVideoId(string url)
-    {
-        if (Uri.TryCreate(url, UriKind.Absolute, out var u))
-        {
-            var v = System.Web.HttpUtility.ParseQueryString(u.Query)["v"];
-            if (!string.IsNullOrEmpty(v)) return v;
-            var seg = u.Segments.LastOrDefault();
-            if (!string.IsNullOrEmpty(seg)) return seg.TrimEnd('/');
-        }
-        return url;
     }
 }

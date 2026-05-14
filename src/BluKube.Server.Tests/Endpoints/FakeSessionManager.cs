@@ -43,6 +43,7 @@ internal sealed class FakeBrowserSession : IBrowserSession
         => Task.FromResult(Current);
     public Task<SessionState> PlayAsync(string videoId, CancellationToken ct = default)
         => Task.FromResult(Current);
+    public Task<SessionState> StopAsync(CancellationToken ct = default) => Task.FromResult(Current);
     public Task<SessionState> PauseAsync(CancellationToken ct = default) => Task.FromResult(Current);
     public Task<SessionState> ResumeAsync(CancellationToken ct = default) => Task.FromResult(Current);
     public Task<SessionState> SeekToAsync(TimeSpan position, CancellationToken ct = default)

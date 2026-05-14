@@ -49,6 +49,9 @@ public class SessionHub : Hub
     public async Task<SessionState> Play(string videoId)
         => await (await RequireSessionAsync()).PlayAsync(videoId, Context.ConnectionAborted);
 
+    public async Task<SessionState> Stop()
+        => await (await RequireSessionAsync()).StopAsync(Context.ConnectionAborted);
+
     public async Task<SessionState> Pause()
         => await (await RequireSessionAsync()).PauseAsync(Context.ConnectionAborted);
 
