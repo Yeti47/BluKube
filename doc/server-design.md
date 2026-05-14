@@ -23,7 +23,7 @@ flowchart TB
     end
     subgraph L3["L3 · Session orchestration"]
         SM["ISessionManager<br/>(registry, cap, idle timeout)"]
-        Sess["ISession<br/>(per-client state machine,<br/>snapshot fan-out)"]
+        Sess["IBrowserSession<br/>(per-client state machine,<br/>snapshot fan-out)"]
     end
     subgraph L2["L2 · Domain capabilities"]
         Search["IMediaSearch"]
@@ -54,8 +54,8 @@ flowchart TB
 |---|---|---|
 | L1 Engine | Playwright, Brave, Xvfb, DOM scripts, page navigation | Nothing above |
 | L2 Domain | Verbs (`PlayAsync`, `SearchAsync`), polling cadence, error mapping to domain errors | L1 |
-| L3 Session | Session identity, lifecycle, snapshot fan-out, optional queue, idle timeout | L2 |
-| L4 Transport | SignalR contract, auth, group membership, REST endpoints | L3 |
+| L3 Session | Session identity, lifecycle, snapshot fan-out, audio stream access, idle timeout | L2 |
+| L4 Transport | SignalR contract, auth, REST endpoints | L3 |
 
 The **testable seam** is L2. Hub and session logic test against fakes implementing `IMediaPlayer` / `IMediaSearch`. Real Brave is exercised only by Docker-only tests at L1/L2.
 
@@ -88,10 +88,9 @@ classDiagram
     }
     class BraveYouTubeBrowser {
         -IPlaywright _pw
-        -IBrowser _browser
         -IBrowserContext _ctx
         -IPage _page
-        -IDisplay _display
+        -string _profilePath
     }
     BraveYouTubeBrowser ..|> IYouTubeBrowser
     BraveYouTubeBrowser ..> ISearchPage : creates
@@ -110,7 +109,9 @@ Nothing in L2/L3/L4 changes unless you decide to expose the new capability throu
 
 ### `IPage` lifetime
 
-One Brave context per session, one tab (`IPage`) per session, reused across pages. `OpenSearchAsync` / `OpenWatchAsync` navigate the same tab and return a *thin wrapper* over that tab. The wrapper is valid only until the next navigation — the browser tracks "current page" internally so callers who hang onto a stale wrapper get a clean exception.
+One Brave context per session, one tab (`IPage`) per session, reused across pages. `OpenSearchAsync` / `OpenWatchAsync` navigate the same tab and return a thin wrapper over that tab. Previously returned page wrappers become stale after the next navigation.
+
+Each Brave context uses a disposable per-session user-data directory under `/var/lib/blukube/brave-profiles/sessions/<guid>`. The launcher seeds it from warmed Brave component/filter state, strips restore/cache state, adds consent cookies, and deletes it when the browser is disposed. This keeps Brave Shields effective without letting previous YouTube tabs leak into a new session.
 
 ---
 
@@ -127,19 +128,17 @@ public interface IMediaSearch
 
 public interface IMediaPlayer : IAsyncDisposable
 {
-    Task PlayAsync(string videoId, CancellationToken ct);
-    Task PauseAsync(CancellationToken ct);
-    Task ResumeAsync(CancellationToken ct);
+    Task<PlayerSnapshot> PlayAsync(string videoId, CancellationToken ct);
+    Task<PlayerSnapshot> PauseAsync(CancellationToken ct);
+    Task<PlayerSnapshot> ResumeAsync(CancellationToken ct);
+    Task<PlayerSnapshot> SeekToAsync(TimeSpan position, CancellationToken ct);
+    Task<PlayerSnapshot> SetVolumeAsync(float volume, CancellationToken ct);
     Task StopAsync(CancellationToken ct);
-    Task SeekToAsync(TimeSpan position, CancellationToken ct);
-    Task SetVolumeAsync(float volume, CancellationToken ct);
-
-    Task<PlaybackState> GetStateAsync(CancellationToken ct);
     IAsyncEnumerable<PlaybackEvent> Events(CancellationToken ct);
 }
 ```
 
-`PlaybackState` is the *current* snapshot. `PlaybackEvent` is incremental: `PositionTick`, `Ended`, `Failed`. The polling loop lives **inside** the implementation (`BraveMediaPlayer`), driven by its own `CancellationTokenSource` keyed to "is something currently playing?". Polling stops on `Pause`/`Stop`/`Dispose` — really stops, not just nulls a field.
+`PlayerSnapshot` is the current playback snapshot. `PlaybackEvent` is incremental: position changes and failures. The polling loop lives inside `BraveMediaPlayer`, driven by its own `CancellationTokenSource` keyed to active playback. Polling stops on `Pause`/`Stop`/`Dispose`.
 
 Both interfaces are implemented by `BraveMediaPlayer`, which composes `IYouTubeBrowser`. They're separate interfaces so:
 
@@ -159,23 +158,24 @@ public abstract record SessionState;
 public sealed record IdleState                                : SessionState;
 public sealed record SearchResultsState(string Query,
         IReadOnlyList<MediaItem> Items)                       : SessionState;
-public sealed record PlaybackState(string VideoId, string Title,
-        TimeSpan Position, TimeSpan Duration,
-        bool IsPlaying, float Volume)                         : SessionState;
+public sealed record PlaybackState(string VideoId,
+    TimeSpan Position, TimeSpan Duration,
+    bool IsPlaying, float Volume)                         : SessionState;
 public sealed record ErrorState(string Code, string Message,
         SessionState? Previous)                               : SessionState;
 ```
 
 `ErrorState.Previous` lets the TUI render an error overlay without losing context — a small affordance that pays off in UX.
 
-### Two channels, not one
+### State and audio streams
 
-The previous prototype mixed command replies and event ticks on a single channel, so a client streaming playback ticks would receive unrelated `SearchResults`. Cleaner split:
+Command replies, state updates, and audio packets are separate flows:
 
 | Channel | Purpose | Direction |
 |---|---|---|
 | Hub method return | Acknowledge a command, surface validation errors | request/reply |
-| `StreamState()` | Continuous, eventually-consistent view of `SessionState` | server → client |
+| `StreamStates()` | Continuous, eventually-consistent view of `SessionState` | server -> client |
+| `StreamAudio()` | Opus packets captured from the session's PulseAudio monitor | server -> client |
 
 Hub methods return `Task` (fire-and-forget) or `Task<SessionState>` for "what does the world look like right after this command". The stream is the source of truth; the reply is a convenience for clients that want a synchronous confirmation.
 
@@ -198,9 +198,9 @@ stateDiagram-v2
 
 ---
 
-## 5. Transport layer — typed hub methods
+## 5. Transport layer — typed hub methods and streams
 
-Drop the `ClientEvent` discriminated union. SignalR has typed hubs; use them.
+The interactive surface is a SignalR hub. Commands are typed hub methods; long-lived state/audio flows use SignalR server streaming.
 
 ```csharp
 public interface ISessionClient   // server → client
@@ -219,12 +219,13 @@ public class SessionHub : Hub<ISessionClient>
     public Task<SessionState> Play(string videoId);
     public Task<SessionState> Pause();
     public Task<SessionState> Resume();
-    public Task<SessionState> Stop();
     public Task<SessionState> SeekTo(TimeSpan position);
     public Task<SessionState> SetVolume(float volume);
 
     // Read
     public Task<SessionState> GetState();
+    public IAsyncEnumerable<SessionState> StreamStates(CancellationToken ct);
+    public IAsyncEnumerable<byte[]> StreamAudio(CancellationToken ct);
 }
 ```
 
@@ -248,7 +249,7 @@ Auth: bearer token middleware applied to `/v1/*` and the hub. Health endpoints s
 sequenceDiagram
     participant TUI
     participant Hub as SessionHub
-    participant Sess as ISession
+    participant Sess as IBrowserSession
     participant Player as IMediaPlayer
     participant Brave as BraveYouTubeBrowser
 
@@ -265,8 +266,7 @@ sequenceDiagram
     Player-->>Sess: IReadOnlyList<MediaItem>
     Sess-->>Hub: SearchResultsState
     Hub-->>TUI: SearchResultsState (reply)
-    Sess->>Hub: State(SearchResultsState) (push)
-    Hub->>TUI: State(SearchResultsState)
+    Sess-->>TUI: SearchResultsState (via StreamStates)
 
     TUI->>Hub: Play("dQw4...")
     Hub->>Sess: Play(...)
@@ -276,12 +276,11 @@ sequenceDiagram
     Player->>Player: start polling loop
     loop every 500ms while playing
         Player->>Sess: PlaybackEvent.PositionTick
-        Sess->>Hub: State(PlaybackState)
-        Hub->>TUI: State(PlaybackState)
+        Sess-->>TUI: PlaybackState (via StreamStates)
     end
 ```
 
-Reply + push together let clients use either pattern. The TUI subscribes once and renders state pushes; a script can call a single command and read the reply.
+    Reply + stream together let clients use either pattern. The TUI subscribes once and renders state stream updates; a script can call a single command and read the reply.
 
 ---
 
@@ -299,10 +298,11 @@ services.AddSingleton<ISessionManager, SessionManager>();
 
 // Transport
 services.AddSignalR();
-services.AddOptions<BluKubeOptions>().BindConfiguration("BluKube");
+services.Configure<AuthOptions>(builder.Configuration.GetSection("Auth"));
+services.Configure<SessionLimits>(builder.Configuration.GetSection("SessionLimits"));
 ```
 
-`SessionManager` is the only thing that constructs `BraveMediaPlayer`. It uses the engine factories to build a fresh `IDisplay` + `IYouTubeBrowser` per session, wraps them in `BraveMediaPlayer`, then in `Session`, and registers the result.
+`SessionManager` is the only thing that constructs `BraveMediaPlayer`. It uses the engine factories to build a fresh `IDisplay`, per-session audio sink, and `IYouTubeBrowser`, wraps them in `BraveMediaPlayer`, then in `BrowserSession`, and registers the result.
 
 Engine resources are **owned by the session, not the process**. Two users issuing `CreateSession()` get two completely independent engines:
 
@@ -328,7 +328,7 @@ flowchart TB
 Implications this drives:
 
 - `XvfbDisplayFactory` must hand out unique display numbers (`:99`, `:100`, …). The factory tracks used numbers and recycles them on session close.
-- Each Brave gets its own user-data dir under e.g. `/tmp/blukube/<sessionId>/`, cleaned up on dispose.
+- Each Brave gets its own disposable user-data dir under `/var/lib/blukube/brave-profiles/sessions/<guid>`, cleaned up on dispose.
 - `MaxSessions` exists primarily as a resource cap (each Brave is ~200 MB RAM); it is not a single-user assumption.
 - A failure in one session's engine (Brave crash, Playwright timeout) marks that session `ErrorState` and disposes its resources — it never affects other sessions.
 
@@ -337,7 +337,7 @@ flowchart LR
     SM[SessionManager] -->|new IDisplay| DF[IDisplayFactory]
     SM -->|new IYouTubeBrowser| BL[IYouTubeBrowserLauncher]
     SM -->|wraps| MP[BraveMediaPlayer<br/>: IMediaPlayer, IMediaSearch]
-    SM -->|wraps| S[Session : ISession]
+    SM -->|wraps| S[BrowserSession : IBrowserSession]
     S --> MP
 ```
 
@@ -394,8 +394,8 @@ src/BluKube.Server/
         ISearchPage.cs
         IWatchPage.cs
         BraveYouTubeBrowser.cs
-        BraveSearchPage.cs
-        BraveWatchPage.cs
+        YouTubeSearchPage.cs
+        YouTubeWatchPage.cs
         IYouTubeBrowserLauncher.cs
         BraveYouTubeBrowserLauncher.cs
       Display/
@@ -403,27 +403,30 @@ src/BluKube.Server/
         IDisplayFactory.cs
         XvfbDisplay.cs
         XvfbDisplayFactory.cs
+            Audio/
+                IAudioOutputDevice.cs
+                PulseAudioOutputDevice.cs
+                OpusEncoder.cs
     Domain/
-      MediaItem.cs
       IMediaSearch.cs
       IMediaPlayer.cs
       PlaybackEvent.cs
       BraveMediaPlayer.cs
     Session/
-      ISession.cs
-      Session.cs
+        IBrowserSession.cs
+        BrowserSession.cs
       ISessionManager.cs
       SessionManager.cs
-      SessionState.cs
   Configuration/
-    BluKubeOptions.cs
+        AuthOptions.cs
+        SessionLimits.cs
+src/BluKube.Contracts/
+    MediaItem.cs
+    SessionState.cs
+    AudioFormat.cs
 ```
 
-Notes on changes from current layout:
-
-- `Core/Search/` and `Core/Playback/` collapse into `Core/Domain/` (one folder per layer, not per feature) plus engine pages under `Core/Engine/Browser/`. Search and playback aren't separate layers — they're separate verbs at the same layer.
-- `UnionShim.cs` is deleted.
-- `Core/Session/ClientEvent.cs` is deleted; its types are replaced by typed hub methods.
+The contracts assembly contains wire-level records shared by the server and TUI. Server domain types stay private unless they are part of that wire contract.
 
 ---
 
@@ -431,27 +434,19 @@ Notes on changes from current layout:
 
 Captured so we don't accidentally design for them:
 
-- **Queue management** stays inside `Session` for now (Enqueue/Next/Prev). Not in `IMediaPlayer` — the player plays one thing at a time. Revisit if a non-Brave player gains native queueing.
-- **Multiple clients per session**: allowed (group membership in SignalR). State pushes broadcast to the whole group. No per-client view yet.
-- **Multiple sessions per server**: this is the headline feature. Each session = one user = one isolated `IDisplay` + `IYouTubeBrowser` + `IMediaPlayer`. They share nothing but the host process. `MaxSessions` (default 3) caps the total based on container resources, not because the design assumes one user.
-- **Persistence**: out of scope. Sessions die with the container.
+- **Queue management**: out of scope. The player handles one selected YouTube video at a time.
+- **Reattach / multiple clients per session**: out of scope. A TUI run creates one session and closing that client closes the session.
+- **Multiple sessions per server**: supported. Each session = one isolated `IDisplay` + `IYouTubeBrowser` + `IMediaPlayer` + audio sink. `MaxSessions` caps total resource usage.
+- **Session persistence**: out of scope. Sessions die on client exit, disconnect, idle reaping, or container shutdown.
 - **HTTPS / TLS**: out of scope; reverse-proxy concern.
 - **Authn beyond shared token**: out of scope.
 
 ---
 
-## 11. Migration plan from the current code
+## 11. Validation
 
-Mechanical, low-risk order:
+The main validation commands are:
 
-1. Delete `UnionShim.cs` and the `union` keyword usage.
-2. Replace `ClientEvent` hierarchy with typed hub methods. Replace `SessionSnapshot` union with the sealed-record `SessionState` hierarchy.
-3. Refactor `IYouTubeBrowser` to expose `OpenSearchAsync` / `OpenWatchAsync`. Delete `IYouTubePage<TParams>` and the `static abstract Create` pattern. Move `YouTubeSearchPage` / `YouTubeWatchPage` behind `ISearchPage` / `IWatchPage`.
-4. Extract `BraveMediaPlayer : IMediaPlayer, IMediaSearch` from the current `BrowserSession`. Move polling into the player with a real, cancellable token.
-5. Reduce `Session` to: hold a `SessionState`, fan out to subscribers via `Channel<SessionState>`, translate `PlaybackEvent` → state updates, delegate commands to player/search.
-6. Split `SessionHub.Connect()` into `CreateSession` plus typed commands. Close the session on disconnect.
-7. Add `MaxSessions` and idle timeout to `SessionManager`.
-8. Add `FakeMediaPlayer` and the first `Session` unit tests.
-9. Add the first Docker-only `BraveMediaPlayer` test.
-
-Each step is small enough to land as its own commit and keeps the project building.
+- `dotnet build BluKube.slnx`
+- `set +H && dotnet test BluKube.slnx --filter 'FullyQualifiedName!~BraveMediaPlayerIntegrationTests'`
+- `docker compose build && BLUKUBE_TOKEN=<token> docker compose up -d`

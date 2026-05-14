@@ -1,8 +1,0 @@
-<Solution>
-  <Folder Name="/src/">
-    <Project Path="src/YtCliRadio/YtCliRadio.csproj" />
-  </Folder>
-  <Folder Name="/tests/">
-    <Project Path="tests/YtCliRadio.Tests/YtCliRadio.Tests.csproj" />
-  </Folder>
-</Solution>
