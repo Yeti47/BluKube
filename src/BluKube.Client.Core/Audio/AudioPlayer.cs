@@ -29,8 +29,8 @@ public sealed class AudioPlayer : IAsyncDisposable
     {
         if (_al is not null) return;
 
-        _alc = ALContext.GetApi(soft: true);
-        _al = AL.GetApi(soft: true);
+        _alc = ALContext.GetApi(soft: false);
+        _al = AL.GetApi(soft: false);
 
         _device = _alc.OpenDevice(string.Empty);
         if (_device is null) throw new InvalidOperationException("OpenAL: cannot open default device");
@@ -46,13 +46,35 @@ public sealed class AudioPlayer : IAsyncDisposable
     /// Drains <paramref name="opusPackets"/> until cancellation. Returns when
     /// the upstream completes or <paramref name="ct"/> fires.
     /// </summary>
+    // Sync helpers: locals in non-async methods live on the real stack,
+    // so &local is safe to pass to native code.
+    private unsafe uint UnqueueOneBuffer(AL al)
+    {
+        uint id = 0;
+        al.SourceUnqueueBuffers(_source, 1, &id);
+        return id;
+    }
+
+    private unsafe void QueueOneBuffer(AL al, uint bufferId)
+    {
+        al.SourceQueueBuffers(_source, 1, &bufferId);
+    }
+
+    private unsafe void UploadPcmToBuffer(AL al, uint bufferId, int decodedSamples)
+    {
+        fixed (short* p = _pcm)
+        {
+            al.BufferData(bufferId, BufferFormat.Stereo16, p,
+                decodedSamples * AudioFormat.Channels * sizeof(short),
+                AudioFormat.SampleRate);
+        }
+    }
+
     public async Task PlayAsync(IAsyncEnumerable<byte[]> opusPackets, CancellationToken ct)
     {
         Open();
         var al = _al!;
 
-        // Pre-allocate buffer ids and queue silence so playback can start the
-        // moment we have one real frame ready (hides decode jitter).
         var buffers = new uint[BufferCount];
         for (int i = 0; i < BufferCount; i++) buffers[i] = al.GenBuffer();
 
@@ -78,8 +100,7 @@ public sealed class AudioPlayer : IAsyncDisposable
                 al.GetSourceProperty(_source, GetSourceInteger.BuffersProcessed, out int processed);
                 while (processed-- > 0)
                 {
-                    uint released = 0;
-                    unsafe { al.SourceUnqueueBuffers(_source, 1, &released); }
+                    uint released = UnqueueOneBuffer(al);
                     if (released != 0) queue.Enqueue(released);
                 }
 
@@ -90,25 +111,15 @@ public sealed class AudioPlayer : IAsyncDisposable
                     al.GetSourceProperty(_source, GetSourceInteger.BuffersProcessed, out processed);
                     while (processed-- > 0)
                     {
-                        uint released = 0;
-                        unsafe { al.SourceUnqueueBuffers(_source, 1, &released); }
+                        uint released = UnqueueOneBuffer(al);
                         if (released != 0) queue.Enqueue(released);
                     }
                     if (queue.Count == 0) continue; // drop frame to avoid stall
                 }
 
                 var buf = queue.Dequeue();
-                unsafe
-                {
-                    fixed (short* p = _pcm)
-                    {
-                        al.BufferData(buf, BufferFormat.Stereo16, p,
-                            decoded * AudioFormat.Channels * sizeof(short),
-                            AudioFormat.SampleRate);
-                    }
-                    uint b = buf;
-                    al.SourceQueueBuffers(_source, 1, &b);
-                }
+                UploadPcmToBuffer(al, buf, decoded);
+                QueueOneBuffer(al, buf);
 
                 if (!started)
                 {

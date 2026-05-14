@@ -25,6 +25,7 @@ public sealed class BraveMediaPlayer(IDisplay display, IYouTubeBrowser browser) 
     private string? _currentVideoId;
     private CancellationTokenSource? _pollCts;
     private Task? _pollTask;
+    private int _userPaused;
 
     public async Task<IReadOnlyList<MediaItem>> SearchAsync(string query, int limit, CancellationToken ct)
     {
@@ -56,6 +57,7 @@ public sealed class BraveMediaPlayer(IDisplay display, IYouTubeBrowser browser) 
             _currentVideoId = videoId;
 
             var snapshot = await watch.EnsurePlayingAsync(ct);
+            Interlocked.Exchange(ref _userPaused, 0);
             StartPolling();
             return snapshot.ToPlayerSnapshot(_currentVideoId ?? string.Empty);
         }
@@ -68,6 +70,7 @@ public sealed class BraveMediaPlayer(IDisplay display, IYouTubeBrowser browser) 
     public Task<PlayerSnapshot> PauseAsync(CancellationToken ct)
         => OnWatch(async (watch, linkedCt) =>
         {
+            Interlocked.Exchange(ref _userPaused, 1);
             await StopPollingAsync();
             return (await watch.PauseAsync(linkedCt)).ToPlayerSnapshot(_currentVideoId ?? string.Empty);
         }, ct);
@@ -75,7 +78,9 @@ public sealed class BraveMediaPlayer(IDisplay display, IYouTubeBrowser browser) 
     public Task<PlayerSnapshot> ResumeAsync(CancellationToken ct)
         => OnWatch(async (watch, linkedCt) =>
         {
-            var snapshot = (await watch.ResumeAsync(linkedCt)).ToPlayerSnapshot(_currentVideoId ?? string.Empty);
+            await StopPollingAsync();
+            var snapshot = (await watch.EnsurePlayingAsync(linkedCt)).ToPlayerSnapshot(_currentVideoId ?? string.Empty);
+            Interlocked.Exchange(ref _userPaused, 0);
             StartPolling();
             return snapshot;
         }, ct);
@@ -153,6 +158,8 @@ public sealed class BraveMediaPlayer(IDisplay display, IYouTubeBrowser browser) 
 
     private void StartPolling()
     {
+        if (_pollTask is { IsCompleted: false }) return;
+
         var cts = CancellationTokenSource.CreateLinkedTokenSource(_disposeCts.Token);
         _pollCts = cts;
         _pollTask = Task.Run(() => PollLoopAsync(cts.Token));
@@ -185,7 +192,15 @@ public sealed class BraveMediaPlayer(IDisplay display, IYouTubeBrowser browser) 
                 PlayerSnapshot snapshot;
                 try
                 {
-                    snapshot = (await watch.ReadStateAsync(ct)).ToPlayerSnapshot(_currentVideoId ?? string.Empty);
+                    var pageSnapshot = await watch.ReadStateAsync(ct);
+                    if (!pageSnapshot.IsPlaying &&
+                        !pageSnapshot.IsEnded &&
+                        pageSnapshot.Duration > TimeSpan.Zero &&
+                        Volatile.Read(ref _userPaused) == 0)
+                    {
+                        pageSnapshot = await watch.EnsurePlayingAsync(ct);
+                    }
+                    snapshot = pageSnapshot.ToPlayerSnapshot(_currentVideoId ?? string.Empty);
                 }
                 catch (OperationCanceledException) { throw; }
                 catch (Exception ex)

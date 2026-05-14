@@ -39,10 +39,10 @@ RUN apt-get update \
 
 ENV BRAVE_EXECUTABLE_PATH=/usr/bin/brave-browser
 
-RUN useradd --create-home --shell /bin/bash --uid 1000 blukube \
-    && mkdir -p /run/user/1000 \
-    && chown blukube:blukube /run/user/1000 \
-    && chmod 700 /run/user/1000
+RUN useradd --create-home --shell /bin/bash --uid 1001 blukube \
+    && mkdir -p /run/user/1001 \
+    && chown blukube:blukube /run/user/1001 \
+    && chmod 700 /run/user/1001
 
 COPY --from=build /app/publish ./
 COPY docker/entrypoint.sh /app/entrypoint.sh
@@ -53,7 +53,7 @@ RUN mkdir -p /var/lib/blukube \
     && chmod a+rx /app/.playwright/node/linux-x64/node
 
 USER blukube
-ENV XDG_RUNTIME_DIR=/run/user/1000
+ENV XDG_RUNTIME_DIR=/run/user/1001
 VOLUME /var/lib/blukube
 
 ENV BLUKUBE_BIND=0.0.0.0:8765

@@ -51,7 +51,7 @@ public sealed class PlayCommand(
                 var pick = console.Prompt(new SelectionPrompt<int>()
                     .Title("Pick a track:")
                     .AddChoices(Enumerable.Range(0, results.Items.Count))
-                    .UseConverter(i => $"{i + 1}. {results.Items[i].Title} — {results.Items[i].Channel}"));
+                    .UseConverter(i => $"{i + 1}. {Markup.Escape(results.Items[i].Title)} — {Markup.Escape(results.Items[i].Channel)}"));
                 var videoId = ExtractVideoId(results.Items[pick].Url);
                 await conn.PlayAsync(videoId, ct);
             }

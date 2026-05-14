@@ -7,7 +7,6 @@ namespace BluKube.Server.Core.Engine.Browser;
 
 public sealed class BraveYouTubeBrowser(
     IPage page,
-    IBrowser browser,
     IBrowserContext context,
     IPlaywright playwright,
     IDisplay display) : IYouTubeBrowser
@@ -30,10 +29,8 @@ public sealed class BraveYouTubeBrowser(
 
     public async ValueTask DisposeAsync()
     {
-        playwright.Dispose();
-
         try { await context.CloseAsync(); } catch { }
-        try { await browser.CloseAsync(); } catch { }
+        playwright.Dispose();
         try { await display.DisposeAsync(); } catch { }
     }
 }

@@ -32,7 +32,10 @@ internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
     }
 
     public async Task<WatchSnapshot> ReadStateAsync(CancellationToken ct)
-        => (await ReadRawAsync()).ToSnapshot();
+    {
+        var raw = await ReadRawAsync();
+        return raw.ToSnapshot();
+    }
 
     public async Task<WatchSnapshot> EnsurePlayingAsync(CancellationToken ct)
     {
@@ -103,20 +106,7 @@ internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
     }
 
     public async Task<WatchSnapshot> ResumeAsync(CancellationToken ct)
-    {
-        await _page.EvaluateAsync(
-            """
-            async () => {
-              const video =
-                document.querySelector("video.video-stream:not([aria-hidden='true'])") ??
-                document.querySelector("video.video-stream") ??
-                document.querySelector("video");
-              if (!video) return;
-              try { await video.play(); } catch { }
-            }
-            """);
-        return (await ReadRawAsync()).ToSnapshot();
-    }
+        => await EnsurePlayingAsync(ct);
 
     public async Task<WatchSnapshot> SeekToAsync(TimeSpan position, CancellationToken ct)
     {
@@ -158,11 +148,15 @@ internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
                 document.querySelector("video.video-stream:not([aria-hidden='true'])") ??
                 document.querySelector("video.video-stream") ??
                 document.querySelector("video");
+              const player = document.querySelector('.html5-video-player');
+              const adShowing = !!(player && (player.classList.contains('ad-showing') || player.classList.contains('ad-interrupting')));
+              const skipBtn = !!document.querySelector('.ytp-ad-skip-button, .ytp-skip-ad-button, .ytp-ad-skip-button-modern');
               if (!video) {
                 return {
                   paused: true, ended: false, muted: false,
                   currentTime: 0, duration: 0, volume: 1,
-                  readyState: 0, networkState: 0, errorCode: null
+                  readyState: 0, networkState: 0, errorCode: null,
+                  adShowing: adShowing, hasSkip: skipBtn, location: location.href
                 };
               }
               return {
@@ -174,7 +168,10 @@ internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
                 volume: Number(video.volume ?? 1),
                 readyState: Number(video.readyState || 0),
                 networkState: Number(video.networkState || 0),
-                errorCode: video.error ? Number(video.error.code) : null
+                errorCode: video.error ? Number(video.error.code) : null,
+                adShowing: adShowing,
+                hasSkip: skipBtn,
+                location: location.href
               };
             }
             """);
@@ -226,6 +223,8 @@ internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
                   kill('tp-yt-iron-overlay-backdrop');
                   kill('ytd-consent-bump-v2-lightbox');
                   kill('ytd-popup-container tp-yt-paper-dialog');
+                  kill('tp-yt-paper-dialog[opened]');
+                  kill('yt-confirm-dialog-renderer');
                   document.documentElement.style.overflow = '';
                   document.body.style.overflow = '';
                 }
@@ -246,6 +245,7 @@ internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
                     document.querySelector("video.video-stream") ??
                     document.querySelector("video");
                   if (!video) return false;
+                  document.querySelector('.ytp-ad-skip-button, .ytp-skip-ad-button, .ytp-ad-skip-button-modern')?.click();
                   try { await video.play(); } catch { }
                   return !video.paused;
                 }
@@ -317,6 +317,9 @@ internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
         public int ReadyState { get; init; }
         public int NetworkState { get; init; }
         public int? ErrorCode { get; init; }
+        public bool AdShowing { get; init; }
+        public bool HasSkip { get; init; }
+        public string? Location { get; init; }
 
         public WatchSnapshot ToSnapshot()
             => new(

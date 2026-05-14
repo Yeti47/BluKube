@@ -5,6 +5,8 @@ namespace BluKube.Server.Core.Engine.Browser;
 
 public sealed class BraveYouTubeBrowserLauncher : IYouTubeBrowserLauncher
 {
+    private const string DefaultProfilePath = "/var/lib/blukube/brave-profile";
+
     private static readonly string[] KnownBravePaths =
     [
         "/usr/bin/brave-browser",
@@ -25,8 +27,10 @@ public sealed class BraveYouTubeBrowserLauncher : IYouTubeBrowserLauncher
         var playwright = await Playwright.CreateAsync();
 
         var braveEnv = InheritAndPatchEnvironment(display, pulseSink);
+        var profilePath = ResolveProfilePath();
+        Directory.CreateDirectory(profilePath);
 
-        var browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
+        var context = await playwright.Chromium.LaunchPersistentContextAsync(profilePath, new BrowserTypeLaunchPersistentContextOptions
         {
             Headless = false,
             ExecutablePath = bravePath,
@@ -43,11 +47,7 @@ public sealed class BraveYouTubeBrowserLauncher : IYouTubeBrowserLauncher
                 "--disable-renderer-backgrounding",
                 "--disable-backgrounding-occluded-windows",
                 "--disable-features=MediaSessionService,IntensiveWakeUpThrottling,CalculateNativeWinOcclusion"
-            ]
-        });
-
-        var context = await browser.NewContextAsync(new BrowserNewContextOptions
-        {
+            ],
             UserAgent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) " +
                         "Chrome/124.0.0.0 Safari/537.36",
             Locale = "en-US",
@@ -61,10 +61,10 @@ public sealed class BraveYouTubeBrowserLauncher : IYouTubeBrowserLauncher
 
         await ApplyConsentCookieAsync(context);
 
-        var page = await context.NewPageAsync();
-        await ApplyAntiDetectionScriptAsync(page);
+        await ApplyAntiDetectionScriptAsync(context);
+        var page = context.Pages.FirstOrDefault() ?? await context.NewPageAsync();
 
-        return new BraveYouTubeBrowser(page, browser, context, playwright, display);
+        return new BraveYouTubeBrowser(page, context, playwright, display);
     }
 
     public string ResolveBravePath()
@@ -83,6 +83,12 @@ public sealed class BraveYouTubeBrowserLauncher : IYouTubeBrowserLauncher
         return KnownBravePaths.FirstOrDefault(File.Exists)
             ?? throw new InvalidOperationException(
                 "Unable to find Brave executable. Set BRAVE_EXECUTABLE_PATH.");
+    }
+
+    private static string ResolveProfilePath()
+    {
+        var fromEnv = Environment.GetEnvironmentVariable("BLUKUBE_BRAVE_PROFILE_PATH");
+        return string.IsNullOrWhiteSpace(fromEnv) ? DefaultProfilePath : fromEnv;
     }
 
     private static Dictionary<string, string> InheritAndPatchEnvironment(IDisplay display, string? pulseSink)
@@ -122,9 +128,9 @@ public sealed class BraveYouTubeBrowserLauncher : IYouTubeBrowserLauncher
             }
         ]);
 
-    private static async Task ApplyAntiDetectionScriptAsync(IPage page)
+    private static async Task ApplyAntiDetectionScriptAsync(IBrowserContext context)
     {
-        await page.AddInitScriptAsync(
+        await context.AddInitScriptAsync(
             """
             () => {
               Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
