@@ -8,12 +8,9 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddScoped<IConfigStore, LocalStorageConfigStore>();
 
-builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents();
-
 var app = builder.Build();
 
-app.UseStaticFiles();
+app.MapStaticAssets();
 app.UseAntiforgery();
 
 app.MapRazorComponents<BluKube.Web.Components.App>()
