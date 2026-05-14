@@ -98,13 +98,13 @@ public sealed class AuthAndSessionsEndpointsTests : IClassFixture<AuthAndSession
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
-            Environment.SetEnvironmentVariable("BLUKUBE_TOKEN", Token);
-            Environment.SetEnvironmentVariable(
-                "BLUKUBE_TOKEN_FILE",
-                Path.Combine(Path.GetTempPath(), $"blukube-test-{Guid.NewGuid():N}.token"));
-
             builder.ConfigureServices(services =>
             {
+                services.PostConfigure<BluKube.Server.Configuration.AuthOptions>(opts =>
+                {
+                    opts.Token = Token;
+                    opts.TokenFile = Path.Combine(Path.GetTempPath(), $"blukube-test-{Guid.NewGuid():N}.token");
+                });
                 // Replace real engine-backed manager with an in-memory fake.
                 services.RemoveAll<ISessionManager>();
                 services.AddSingleton<ISessionManager, FakeSessionManager>();
