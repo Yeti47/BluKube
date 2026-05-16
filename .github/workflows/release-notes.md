@@ -21,12 +21,10 @@ docker run --rm \
 ```bash
 docker run --rm \
   -p 8080:8080 \
-  --add-host=host.docker.internal:host-gateway \
-  -e BluKube__DefaultServerUrl=http://host.docker.internal:8765 \
   ghcr.io/{{OWNER}}/blukube-web:{{TAG}}
 ```
 
-Open `http://127.0.0.1:8080`, confirm or edit the BluKube server URL, and enter the auth token. `BluKube__DefaultServerUrl` only pre-fills the login form; submitted connection settings are stored in your browser.
+Open `http://127.0.0.1:8080`, confirm or edit the BluKube server URL, and enter the auth token. `BluKube__DefaultServerUrl` is an environment variable you can pass to docker to pre-fill the login form; submitted connection settings are stored in your browser.
 
 ## Use the TUI binary
 
