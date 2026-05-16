@@ -727,6 +727,10 @@ a {
     padding: 1.4rem 1rem;
   }
 
+  .setup-download-cta {
+    display: none;
+  }
+
   .client-header {
     align-items: stretch;
     flex-direction: column;
