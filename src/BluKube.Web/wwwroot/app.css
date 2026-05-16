@@ -231,12 +231,49 @@ a {
 }
 
 .client-page {
+  position: relative;
   display: flex;
   flex-direction: column;
   width: 100vw;
   height: 100vh;
   background: var(--bg);
   box-sizing: border-box;
+}
+
+.auth-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(1, 4, 9, 0.78);
+  backdrop-filter: blur(2px);
+  opacity: 1;
+  transition: opacity 0.16s ease-out;
+}
+
+.auth-overlay.fade-out {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.auth-overlay-panel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  color: var(--blue);
+  border: 1px solid rgba(88, 166, 255, 0.35);
+  background: rgba(13, 17, 23, 0.92);
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  box-shadow: 0 14px 34px rgba(1, 4, 9, 0.45);
+}
+
+.auth-overlay-panel strong {
+  color: #f0f6fc;
+  font-size: 0.94rem;
+  letter-spacing: 0.02em;
 }
 
 .terminal-page,

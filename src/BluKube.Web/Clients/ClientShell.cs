@@ -22,12 +22,14 @@ public sealed class ClientShell
     private readonly ClientSession _session;
     private readonly IReadOnlyDictionary<ClientView, IClientView> _clients;
     private bool _pendingClientInit;
+    private bool _showAuthenticatingOverlay;
 
     public event EventHandler? StateChanged;
 
     public ClientState State { get; private set; } = ClientState.Loading;
     public ClientView View { get; private set; } = ClientView.Terminal;
     public string? LoginError { get; private set; }
+    public bool ShowAuthenticatingOverlay => _showAuthenticatingOverlay;
     public bool IsNativeView => View == ClientView.Native;
     public string PageClass => IsNativeView ? "native-page" : "terminal-page";
 
@@ -47,13 +49,14 @@ public sealed class ClientShell
         {
             LoginError = null;
             State = ClientState.Login;
+            _showAuthenticatingOverlay = false;
         }
         else
         {
             View = await PreferNativeClientAsync();
             LoginError = null;
             State = ClientState.Client;
-            QueueClientInit();
+            QueueClientInit(showAuthenticatingOverlay: true);
         }
 
         NotifyStateChanged();
@@ -64,7 +67,7 @@ public sealed class ClientShell
         View = await PreferNativeClientAsync();
         LoginError = null;
         State = ClientState.Client;
-        QueueClientInit();
+        QueueClientInit(showAuthenticatingOverlay: true);
         NotifyStateChanged();
     }
 
@@ -77,6 +80,7 @@ public sealed class ClientShell
             client.ClearState();
 
         _pendingClientInit = false;
+        _showAuthenticatingOverlay = false;
         LoginError = null;
         State = ClientState.Login;
         NotifyStateChanged();
@@ -102,6 +106,12 @@ public sealed class ClientShell
 
         _pendingClientInit = false;
         await CurrentClient.ActivateAsync();
+
+        if (_showAuthenticatingOverlay)
+        {
+            _showAuthenticatingOverlay = false;
+            NotifyStateChanged();
+        }
     }
 
     public async Task StopAsync(bool resetSession = true)
@@ -117,13 +127,14 @@ public sealed class ClientShell
         await StopAsync();
 
         View = view;
-        QueueClientInit();
+        QueueClientInit(showAuthenticatingOverlay: false);
         NotifyStateChanged();
     }
 
-    private void QueueClientInit()
+    private void QueueClientInit(bool showAuthenticatingOverlay)
     {
         _pendingClientInit = true;
+        _showAuthenticatingOverlay = showAuthenticatingOverlay;
     }
 
     private async Task<ClientView> PreferNativeClientAsync()
@@ -153,6 +164,7 @@ public sealed class ClientShell
             client.ClearState();
 
         _pendingClientInit = false;
+        _showAuthenticatingOverlay = false;
         LoginError = message;
         State = ClientState.Login;
         NotifyStateChanged();

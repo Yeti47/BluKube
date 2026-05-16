@@ -28,12 +28,28 @@ else
         {
             <NativeView />
         }
+
+        @if (_showAuthOverlay)
+        {
+            <div class="auth-overlay @(_authOverlayFading ? "fade-out" : string.Empty)" role="status" aria-live="polite" aria-label="Authenticating">
+                <div class="auth-overlay-panel">
+                    <span class="busy-bars" aria-hidden="true"><span></span><span></span><span></span></span>
+                    <strong>Authenticating...</strong>
+                </div>
+            </div>
+        }
     </div>
 }
 
 @code {
+    private const int AuthOverlayFadeMs = 160;
+    private bool _showAuthOverlay;
+    private bool _authOverlayFading;
+    private CancellationTokenSource? _authOverlayFadeCts;
+
     protected override void OnInitialized()
     {
+        _showAuthOverlay = Client.ShowAuthenticatingOverlay;
         Client.StateChanged += Refresh;
     }
 
@@ -50,11 +66,46 @@ else
 
     private void Refresh(object? sender, EventArgs args)
     {
+        if (Client.ShowAuthenticatingOverlay)
+        {
+            _authOverlayFadeCts?.Cancel();
+            _authOverlayFadeCts?.Dispose();
+            _authOverlayFadeCts = null;
+            _authOverlayFading = false;
+            _showAuthOverlay = true;
+        }
+        else if (_showAuthOverlay && !_authOverlayFading)
+        {
+            _authOverlayFading = true;
+            _ = FadeOutAuthOverlayAsync();
+        }
+
         _ = InvokeAsync(StateHasChanged);
+    }
+
+    private async Task FadeOutAuthOverlayAsync()
+    {
+        _authOverlayFadeCts?.Cancel();
+        _authOverlayFadeCts?.Dispose();
+        _authOverlayFadeCts = new CancellationTokenSource();
+
+        try
+        {
+            await Task.Delay(AuthOverlayFadeMs, _authOverlayFadeCts.Token);
+            _showAuthOverlay = false;
+            _authOverlayFading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (OperationCanceledException)
+        {
+            _authOverlayFading = false;
+        }
     }
 
     public async ValueTask DisposeAsync()
     {
+        _authOverlayFadeCts?.Cancel();
+        _authOverlayFadeCts?.Dispose();
         Client.StateChanged -= Refresh;
         await Client.StopAsync(resetSession: false);
     }
