@@ -19,6 +19,7 @@ internal sealed class UiState
     public string? Error { get; set; }
     public string? CurrentTitle { get; set; }
     public string? CurrentChannel { get; set; }
+    public bool CompactPlayback { get; set; }
     public int Page { get; set; }
     public int PageSize { get; } = 10;
 }

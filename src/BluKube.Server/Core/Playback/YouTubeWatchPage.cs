@@ -18,11 +18,17 @@ internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
 
     public async Task NavigateAsync(CancellationToken ct)
     {
-        var url = $"https://www.youtube.com/watch?v={Uri.EscapeDataString(videoId)}";
+        await _page.AddInitScriptAsync(
+            """
+                        try { localStorage.setItem('yt-player-autonav-state', 'false'); } catch { }
+            """);
+
+        var url = $"https://www.youtube.com/watch?v={Uri.EscapeDataString(videoId)}&autoplay=0";
         await _page.GotoAsync(url,
             new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = 45000 });
 
         await DismissConsentAsync(_page);
+        await DisableAutoplayAsync(_page);
 
         await _page.WaitForFunctionAsync(
             $$"""
@@ -33,6 +39,7 @@ internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
             """,
             new PageWaitForFunctionOptions { Timeout = 30000 });
 
+            await DisableAutoplayAsync(_page);
             await EnsureOriginalAudioAsync(_page);
     }
 
@@ -50,6 +57,7 @@ internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
         for (var attempt = 0; attempt < 5; attempt++)
         {
             await DismissConsentAsync(page);
+            await DisableAutoplayAsync(page);
             await EnsureOriginalAudioAsync(page);
 
             var before = await ReadRawAsync();
@@ -226,6 +234,28 @@ internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
             return false;
         }
     }
+
+        private static async Task DisableAutoplayAsync(IPage page)
+        {
+                try
+                {
+                        await page.EvaluateAsync(
+                                """
+                                () => {
+                                    try { localStorage.setItem('yt-player-autonav-state', 'false'); } catch { }
+
+                                    const player = document.getElementById('movie_player');
+                                    try { player?.setAutonavState?.(false); } catch { }
+
+                                    const toggle = document.querySelector('.ytp-autonav-toggle-button');
+                                    if (toggle?.getAttribute('aria-checked') === 'true') {
+                                        toggle.click();
+                                    }
+                                }
+                                """);
+                }
+                catch { }
+        }
 
         private static async Task EnsureOriginalAudioAsync(IPage page)
         {

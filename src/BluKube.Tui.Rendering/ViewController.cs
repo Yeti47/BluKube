@@ -98,6 +98,13 @@ public sealed class ViewController(
                     break;
                 }
 
+                if (ViewHelpers.IsAltCharacter(key, 'x'))
+                {
+                    console.Clear();
+                    await redraw.Writer.WriteAsync(true, ct);
+                    continue;
+                }
+
                 try
                 {
                     if (!state.IsBusy)
@@ -140,7 +147,7 @@ public sealed class ViewController(
         {
             ViewMode.Search  => new SearchBox(state.Query, state.Status, state.Error),
             ViewMode.Results => BuildResultsTable(state),
-            ViewMode.Player  => new PlaybackPanel(state.ServerState as PlaybackState, state.CurrentTitle, state.CurrentChannel, state.Error),
+            ViewMode.Player  => new PlaybackPanel(state.ServerState as PlaybackState, state.CurrentTitle, state.CurrentChannel, state.Error, state.CompactPlayback),
             _                => new Markup(string.Empty)
         };
 
@@ -148,7 +155,7 @@ public sealed class ViewController(
         {
             ViewMode.Search  => enableQuitKeys ? "enter search  •  esc clear  •  ctrl+q quit" : "enter search  •  esc clear",
             ViewMode.Results => enableQuitKeys ? "↑/↓ select  •  ←/→ page  •  enter play  •  esc search  •  q quit" : "↑/↓ select  •  ←/→ page  •  enter play  •  esc search",
-            ViewMode.Player  => enableQuitKeys ? "space play/pause  •  ←/→ seek  •  ↑/↓ volume  •  esc search  •  q quit" : "space play/pause  •  ←/→ seek  •  ↑/↓ volume  •  esc search",
+            ViewMode.Player  => enableQuitKeys ? "space play/pause  •  ←/→ seek  •  ↑/↓ volume  •  alt+c compact  •  alt+x clear  •  esc search  •  q quit" : "space play/pause  •  ←/→ seek  •  ↑/↓ volume  •  alt+c compact  •  alt+x clear  •  esc search",
             _                => string.Empty
         };
 

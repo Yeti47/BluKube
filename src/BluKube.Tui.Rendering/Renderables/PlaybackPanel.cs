@@ -11,12 +11,16 @@ internal sealed class PlaybackPanel(
     PlaybackState? playback,
     string? title,
     string? channel,
-    string? error) : IRenderable
+    string? error,
+    bool compact = false) : IRenderable
 {
     private IRenderable Build()
     {
         if (playback is null)
             return new Panel(new Markup("[grey]Loading...[/]")).Header("[bold]playback[/]");
+
+        if (compact)
+            return BuildCompact(playback);
 
         var percent = playback.Duration.TotalSeconds > 0
             ? Math.Clamp(playback.Position.TotalSeconds / playback.Duration.TotalSeconds, 0d, 1d)
@@ -47,6 +51,19 @@ internal sealed class PlaybackPanel(
 
         if (!string.IsNullOrWhiteSpace(error))
             stack.AddRow(new Markup($"[red]{Markup.Escape(error)}[/]"));
+
+        return new Panel(stack).Header("[bold]playback[/]");
+    }
+
+    private IRenderable BuildCompact(PlaybackState playback)
+    {
+        var stack = new Grid().AddColumn().AddColumn()
+            .AddRow("[grey]state[/]", playback.IsPlaying ? "[green]playing[/]" : "[yellow]paused[/]")
+            .AddRow("[grey]time[/]", $"{ViewHelpers.FormatTime(playback.Position)} / {ViewHelpers.FormatTime(playback.Duration)}")
+            .AddRow("[grey]volume[/]", $"{(int)Math.Round(playback.Volume * 100)}%");
+
+        if (!string.IsNullOrWhiteSpace(error))
+            stack.AddRow("[grey]error[/]", $"[red]{Markup.Escape(error)}[/]");
 
         return new Panel(stack).Header("[bold]playback[/]");
     }

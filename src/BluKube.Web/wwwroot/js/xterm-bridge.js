@@ -67,6 +67,38 @@ window.xtermBridge = (() => {
     }
 
     return {
+        prefersNativeClient() {
+            const coarsePointer = window.matchMedia?.('(pointer: coarse)').matches ?? false;
+            const narrowViewport = window.matchMedia?.('(max-width: 720px)').matches ?? false;
+            return coarsePointer || narrowViewport || navigator.maxTouchPoints > 0;
+        },
+
+        resumeAudio() {
+            resumeAudio();
+        },
+
+        async downloadFile(url, fileName) {
+            try {
+                const response = await fetch(url, { credentials: 'omit' });
+                if (!response.ok) throw new Error(`Download failed with ${response.status}`);
+
+                const blob = await response.blob();
+                const objectUrl = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = objectUrl;
+                link.download = fileName || url.split('/').pop() || 'download';
+                link.rel = 'noopener';
+                link.style.display = 'none';
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+
+                window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+            } catch {
+                window.open(url, '_blank', 'noopener');
+            }
+        },
+
         /**
          * Initialise an xterm.js Terminal inside the given container element.
          *
@@ -108,12 +140,19 @@ window.xtermBridge = (() => {
             // Forward key events to the Blazor component.
             // Also initialise/resume AudioContext here — onKey fires in a user-gesture context.
             _terminal.onKey(({ domEvent }) => {
+                const key = domEvent.key?.toLowerCase();
+                if (domEvent.altKey && !domEvent.ctrlKey && (key === 'c' || key === 'x')) {
+                    domEvent.preventDefault();
+                    domEvent.stopPropagation();
+                }
+
                 resumeAudio();
                 dotNetRef.invokeMethodAsync(
                     'OnXtermKey',
                     domEvent.key,
                     domEvent.shiftKey,
-                    domEvent.ctrlKey
+                    domEvent.ctrlKey,
+                    domEvent.altKey
                 );
             });
 

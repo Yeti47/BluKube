@@ -30,6 +30,12 @@ internal static class ViewHelpers
         return false;
     }
 
+    public static bool IsCharacter(KeyPress key, char character) =>
+        !key.Ctrl && !key.Alt && char.ToUpperInvariant(key.Character) == char.ToUpperInvariant(character);
+
+    public static bool IsAltCharacter(KeyPress key, char character) =>
+        key.Alt && !key.Ctrl && char.ToUpperInvariant(key.Character) == char.ToUpperInvariant(character);
+
     public static string ExtractVideoId(string url)
     {
         if (Uri.TryCreate(url, UriKind.Absolute, out var uri))

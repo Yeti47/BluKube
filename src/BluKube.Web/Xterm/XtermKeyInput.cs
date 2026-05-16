@@ -20,8 +20,8 @@ public sealed class XtermKeyInput : IKeyInput
     /// <param name="domKey">
     /// The <c>KeyboardEvent.key</c> value (e.g. "Enter", "ArrowUp", "a").
     /// </param>
-    public void Post(string domKey, bool shift, bool ctrl) =>
-        _channel.Writer.TryWrite(Map(domKey, shift, ctrl));
+    public void Post(string domKey, bool shift, bool ctrl, bool alt) =>
+        _channel.Writer.TryWrite(Map(domKey, shift, ctrl, alt));
 
     /// <summary>Signals end-of-input; causes <see cref="ReadKeysAsync"/> to complete.</summary>
     public void Complete() => _channel.Writer.TryComplete();
@@ -33,7 +33,7 @@ public sealed class XtermKeyInput : IKeyInput
             yield return kp;
     }
 
-    private static KeyPress Map(string domKey, bool shift, bool ctrl)
+    private static KeyPress Map(string domKey, bool shift, bool ctrl, bool alt)
     {
         var (key, ch) = domKey switch
         {
@@ -50,6 +50,6 @@ public sealed class XtermKeyInput : IKeyInput
                                 ? (Key.Char, domKey[0])
                                 : (Key.Other, '\0')
         };
-        return new KeyPress(key, ch, shift, ctrl);
+        return new KeyPress(key, ch, shift, ctrl, alt);
     }
 }

@@ -10,78 +10,204 @@
 
 @if (_mode == AppMode.Loading)
 {
-    <div class="loading">Loading…</div>
+    <div class="loading">Loading...</div>
 }
 else if (_mode == AppMode.Setup)
 {
     <form class="setup" @onsubmit="SaveConfigAsync" @onsubmit:preventDefault>
-        <h1>BluKube</h1>
-        <p>Enter your server details to get started.</p>
-        <div class="field">
-            <label for="serverUrl">Server URL</label>
-            <input id="serverUrl" type="url" placeholder="http://localhost:8765"
-                   @bind="_serverUrl" @bind:event="oninput" />
+        <div class="setup-copy">
+            <h1>BluKube</h1>
+            <p>Enter your server details to get started.</p>
         </div>
-        <div class="field">
-            <label for="token">Token</label>
-            <input id="token" type="password" placeholder="Enter your access token" required
-                   @bind="_token" @bind:event="oninput" />
+
+        <div class="setup-fields">
+            <div class="field">
+                <label for="serverUrl">Server URL</label>
+                <input id="serverUrl" type="url" placeholder="http://localhost:8765"
+                       @bind="_serverUrl" @bind:event="oninput" />
+            </div>
+            <div class="field">
+                <label for="token">Token</label>
+                <input id="token" type="password" placeholder="Enter your access token" required
+                       @bind="_token" @bind:event="oninput" />
+            </div>
         </div>
+
         @if (_setupError is not null)
         {
             <p class="error">@_setupError</p>
         }
-        <button type="submit" disabled="@(!CanConnect)">
-            Connect
-        </button>
+
+        <div class="setup-actions">
+            <button type="submit" disabled="@(!CanConnect)">Connect</button>
+            <p class="setup-download-cta">
+                Want a real terminal experience?
+                <a class="setup-download" href="@TuiDownloadUrl" @onclick="DownloadTuiAsync" @onclick:preventDefault>
+                    Download TUI (linux)
+                </a>
+            </p>
+        </div>
     </form>
 }
 else
 {
-    <div class="terminal-page">
-        <header class="terminal-header">
-            <div class="terminal-logo">
-                <pre class="logo-art"><span>&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2557; &#x2588;&#x2588;&#x2557;     &#x2588;&#x2588;&#x2557;   &#x2588;&#x2588;&#x2557;&#x2588;&#x2588;&#x2557;  &#x2588;&#x2588;&#x2557;&#x2588;&#x2588;&#x2557;   &#x2588;&#x2588;&#x2557;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2557; &#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2557;
-&#x2588;&#x2588;&#x2554;&#x2550;&#x2550;&#x2588;&#x2588;&#x2557;&#x2588;&#x2588;&#x2551;     &#x2588;&#x2588;&#x2551;   &#x2588;&#x2588;&#x2551;&#x2588;&#x2588;&#x2551; &#x2588;&#x2588;&#x2554;&#x255D;&#x2588;&#x2588;&#x2551;   &#x2588;&#x2588;&#x2551;&#x2588;&#x2588;&#x2554;&#x2550;&#x2550;&#x2588;&#x2588;&#x2557;&#x2588;&#x2588;&#x2554;&#x2550;&#x2550;&#x2550;&#x2550;&#x255D;
-&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2554;&#x255D;&#x2588;&#x2588;&#x2551;     &#x2588;&#x2588;&#x2551;   &#x2588;&#x2588;&#x2551;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2554;&#x255D; &#x2588;&#x2588;&#x2551;   &#x2588;&#x2588;&#x2551;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2554;&#x255D;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2557;  
-&#x2588;&#x2588;&#x2554;&#x2550;&#x2550;&#x2588;&#x2588;&#x2557;&#x2588;&#x2588;&#x2551;     &#x2588;&#x2588;&#x2551;   &#x2588;&#x2588;&#x2551;&#x2588;&#x2588;&#x2554;&#x2550;&#x2588;&#x2588;&#x2557; &#x2588;&#x2588;&#x2551;   &#x2588;&#x2588;&#x2551;&#x2588;&#x2588;&#x2554;&#x2550;&#x2550;&#x2588;&#x2588;&#x2557;&#x2588;&#x2588;&#x2554;&#x2550;&#x2550;&#x255D;  
-&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2554;&#x255D;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2557;&#x255A;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2554;&#x255D;&#x2588;&#x2588;&#x2551;  &#x2588;&#x2588;&#x2557;&#x255A;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2554;&#x255D;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2554;&#x255D;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2588;&#x2557;
-&#x255A;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x255D; &#x255A;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x255D; &#x255A;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x255D; &#x255A;&#x2550;&#x255D;  &#x255A;&#x2550;&#x255D; &#x255A;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x255D; &#x255A;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x255D; &#x255A;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x2550;&#x255D;</span></pre>
+    <div class="client-page @(_clientView == ClientView.Native ? "native-page" : "terminal-page")">
+        <header class="client-header">
+            <div class="brand-block">
+                                <pre class="brand-cube" aria-hidden="true"> +--+
+/  /|
+--+ |
+    |/
+--+</pre>
+                <div class="brand-copy">
+                    <strong>BluKube</strong>
+                    <span class="brand-meta">Remote Client</span>
+                </div>
             </div>
-            <button class="logout-button" type="button" @onclick="ClearConfigAsync" title="Clear saved server URL and token">
-                Log out
-            </button>
+
+            <div class="header-actions">
+                <div class="view-toggle" role="tablist" aria-label="Client view">
+                    <button type="button" class="@ViewButtonClass(ClientView.Native)" @onclick="() => SwitchClientViewAsync(ClientView.Native)">Web</button>
+                    <button type="button" class="@ViewButtonClass(ClientView.Terminal)" @onclick="() => SwitchClientViewAsync(ClientView.Terminal)">Terminal</button>
+                </div>
+                <a class="download-link" href="@TuiDownloadUrl" @onclick="DownloadTuiAsync" @onclick:preventDefault>Download TUI</a>
+                <button class="logout-button" type="button" @onclick="ClearConfigAsync" title="Clear saved server URL and token">Log out</button>
+            </div>
         </header>
-        <div id="xterm-container"></div>
+
+        @if (_clientView == ClientView.Terminal)
+        {
+            <div id="xterm-container"></div>
+        }
+        else
+        {
+            <main class="native-client">
+                <div class="native-terminal">
+                    <section class="native-search">
+                        <form class="native-search-form" @onsubmit="SearchNativeAsync" @onsubmit:preventDefault>
+                            <input type="search" placeholder="Search YouTube" @bind="_nativeQuery" @bind:event="oninput" />
+                            <button type="submit" disabled="@(_nativeBusy || string.IsNullOrWhiteSpace(_nativeQuery))">Search</button>
+                        </form>
+                        <div class="native-search-feedback">
+                            @if (_nativeError is not null)
+                            {
+                                <p class="error">@_nativeError</p>
+                            }
+                            else if (_nativeBusyMessage is not null)
+                            {
+                                <div class="busy-row" role="status" aria-live="polite">
+                                    <span class="busy-bars" aria-hidden="true"><span></span><span></span><span></span></span>
+                                    <span>@_nativeBusyMessage</span>
+                                </div>
+                            }
+                        </div>
+                    </section>
+
+                    <section class="native-player">
+                        @if (_nativeState is PlaybackState playback)
+                        {
+                            <div class="now-line @(playback.IsPlaying ? "is-playing" : "is-paused")">
+                                <span class="playback-indicator" aria-hidden="true"></span>
+                                <span class="track-copy">
+                                    <strong>@(_nativeCurrentTitle ?? playback.VideoId)</strong>
+                                    @if (!string.IsNullOrWhiteSpace(_nativeCurrentChannel))
+                                    {
+                                        <small>@_nativeCurrentChannel</small>
+                                    }
+                                </span>
+                            </div>
+                            <progress value="@ProgressValue(playback)" max="100"></progress>
+                            <div class="time-row">
+                                <span>@FormatTime(playback.Position)</span>
+                                <span>@FormatTime(playback.Duration)</span>
+                            </div>
+                            <div class="native-controls">
+                                <button type="button" class="seek-control" aria-label="Rewind 30 seconds" title="Rewind 30 seconds" @onclick="() => SeekNativeAsync(TimeSpan.FromSeconds(-30))" disabled="@_nativeBusy">&lt;&lt; 30</button>
+                                <button type="button" class="seek-control" aria-label="Rewind 10 seconds" title="Rewind 10 seconds" @onclick="() => SeekNativeAsync(TimeSpan.FromSeconds(-10))" disabled="@_nativeBusy">&lt; 10</button>
+                                <button class="primary-control @(playback.IsPlaying ? "is-playing" : "is-paused")" type="button" @onclick="ToggleNativePlaybackAsync" disabled="@_nativeBusy">@(playback.IsPlaying ? "Pause" : "Play")</button>
+                                <button type="button" class="seek-control" aria-label="Fast-forward 10 seconds" title="Fast-forward 10 seconds" @onclick="() => SeekNativeAsync(TimeSpan.FromSeconds(10))" disabled="@_nativeBusy">10 &gt;</button>
+                                <button type="button" class="seek-control" aria-label="Fast-forward 30 seconds" title="Fast-forward 30 seconds" @onclick="() => SeekNativeAsync(TimeSpan.FromSeconds(30))" disabled="@_nativeBusy">30 &gt;&gt;</button>
+                                <button type="button" @onclick="StopNativeAsync" disabled="@_nativeBusy">Stop</button>
+                            </div>
+                            <label class="volume-control">
+                                <span>Volume</span>
+                                <input type="range" min="0" max="100" value="@VolumePercent(playback)" @oninput="SetNativeVolumeAsync" disabled="@_nativeBusy" />
+                                <span>@VolumePercent(playback)%</span>
+                            </label>
+                        }
+                        else
+                        {
+                            <div class="empty-player">
+                                <span>No active playback.</span>
+                            </div>
+                        }
+                    </section>
+
+                    @if (_nativeResults.Count > 0)
+                    {
+                        <section class="native-results" aria-label="Search results">
+                            @foreach (var item in _nativeResults)
+                            {
+                                <button type="button" class="result-row" @onclick="() => PlayNativeAsync(item)" disabled="@_nativeBusy">
+                                    <span>
+                                        <strong>@item.Title</strong>
+                                        <small>@item.Channel</small>
+                                    </span>
+                                    @if (IsLiveDuration(item.Duration))
+                                    {
+                                        <span class="live-pill">LIVE</span>
+                                    }
+                                    else
+                                    {
+                                        <span>@FormatTime(item.Duration)</span>
+                                    }
+                                </button>
+                            }
+                        </section>
+                    }
+                </div>
+            </main>
+        }
     </div>
 }
 
 @code {
-    private enum AppMode { Loading, Setup, Terminal }
+    private enum AppMode { Loading, Setup, Client }
+    private enum ClientView { Terminal, Native }
 
-    // ── view state ───────────────────────────────────────────────────────────
+    private const string TuiDownloadUrl = "https://github.com/Yeti47/BluKube/releases/latest/download/blukube-linux-x64.tar.gz";
+    private const string TuiDownloadFileName = "blukube-linux-x64.tar.gz";
+
     private AppMode _mode = AppMode.Loading;
-    private bool    _pendingInit;
+    private ClientView _clientView = ClientView.Terminal;
+    private bool _pendingTerminalInit;
+    private bool _pendingNativeInit;
 
-    // ── setup form state ─────────────────────────────────────────────────────
-    private string  _serverUrl  = string.Empty;
-    private string  _token      = string.Empty;
+    private string _serverUrl = string.Empty;
+    private string _token = string.Empty;
     private string? _setupError;
     private bool CanConnect =>
         !string.IsNullOrWhiteSpace(_serverUrl) && !string.IsNullOrWhiteSpace(_token);
 
-    // ── xterm bridge ────────────────────────────────────────────────────────
-    private readonly XtermWriter   _writer   = new();
+    private readonly XtermWriter _writer = new();
     private readonly XtermKeyInput _keyInput = new();
 
-    // ── lifecycle handles ───────────────────────────────────────────────────
     private DotNetObjectReference<Home>? _ref;
     private CancellationTokenSource _cts = new();
     private Task? _viewTask;
     private Task? _pumpTask;
     private Task? _audioTask;
+    private Task? _nativeStateTask;
     private BluKubeConnection? _connection;
-    // ── Blazor lifecycle ─────────────────────────────────────────────────────
+
+    private string _nativeQuery = string.Empty;
+    private bool _nativeBusy;
+    private string? _nativeBusyMessage;
+    private string? _nativeError;
+    private SessionState _nativeState = new IdleState();
+    private IReadOnlyList<MediaItem> _nativeResults = [];
+    private string? _nativeCurrentTitle;
+    private string? _nativeCurrentChannel;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -96,28 +222,43 @@ else
             }
             else
             {
-                _mode        = AppMode.Terminal;
-                _pendingInit = true;
+                _clientView = await PreferNativeClientAsync();
+                _mode = AppMode.Client;
+                QueueClientInit();
             }
+
             StateHasChanged();
             return;
         }
 
-        if (_pendingInit)
+        if (_pendingTerminalInit)
         {
-            _pendingInit = false;
+            _pendingTerminalInit = false;
             try
             {
-                await InitAsync();
+                await InitTerminalAsync();
             }
             catch (Exception ex)
             {
                 _writer.WriteLine($"\x1b[31mError: {ex.Message}\x1b[0m");
             }
         }
-    }
 
-    // ── setup form handler ────────────────────────────────────────────────────
+        if (_pendingNativeInit)
+        {
+            _pendingNativeInit = false;
+            try
+            {
+                await InitNativeAsync();
+            }
+            catch (Exception ex)
+            {
+                _nativeError = ex.Message;
+                ClearNativeBusy();
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+    }
 
     private async Task SaveConfigAsync()
     {
@@ -138,15 +279,20 @@ else
 
         await ConfigStore.SaveAsync(new ConnectionSettings(uri, _token.Trim()), _cts.Token);
 
-        _mode        = AppMode.Terminal;
-        _pendingInit = true;
-        // StateHasChanged is implicit after a Blazor event handler
+        _clientView = await PreferNativeClientAsync();
+        _mode = AppMode.Client;
+        QueueClientInit();
+    }
+
+    private async Task DownloadTuiAsync()
+    {
+        await JS.InvokeVoidAsync("xtermBridge.downloadFile", TuiDownloadUrl, TuiDownloadFileName);
     }
 
     private async Task ClearConfigAsync()
     {
         await ConfigStore.ClearAsync(CancellationToken.None);
-        await StopTerminalAsync();
+        await StopClientAsync();
 
         _cts.Dispose();
         _cts = new CancellationTokenSource();
@@ -154,49 +300,267 @@ else
         _serverUrl = string.Empty;
         _token = string.Empty;
         _setupError = null;
-        _pendingInit = false;
+        _nativeQuery = string.Empty;
+        ResetNativeState();
+        _pendingTerminalInit = false;
+        _pendingNativeInit = false;
         _mode = AppMode.Setup;
     }
 
-    // ── terminal initialisation ───────────────────────────────────────────────
+    private async Task SwitchClientViewAsync(ClientView view)
+    {
+        if (_clientView == view) return;
 
-    private async Task InitAsync()
+        await StopClientAsync();
+        _cts.Dispose();
+        _cts = new CancellationTokenSource();
+
+        _clientView = view;
+        ResetNativeState();
+        QueueClientInit();
+    }
+
+    private void QueueClientInit()
+    {
+        _pendingTerminalInit = _clientView == ClientView.Terminal;
+        _pendingNativeInit = _clientView == ClientView.Native;
+    }
+
+    private async Task<ClientView> PreferNativeClientAsync()
+    {
+        try
+        {
+            return await JS.InvokeAsync<bool>("xtermBridge.prefersNativeClient")
+                ? ClientView.Native
+                : ClientView.Terminal;
+        }
+        catch
+        {
+            return ClientView.Terminal;
+        }
+    }
+
+    private async Task<BluKubeConnection> ConnectSessionAsync()
+    {
+        var settings = await ConfigStore.LoadAsync(_cts.Token)
+            ?? throw new InvalidOperationException("No connection settings found.");
+
+        var connection = new BluKubeConnection(settings);
+        await connection.ConnectAsync(_cts.Token);
+        _ = await connection.CreateSessionAsync(_cts.Token);
+        _connection = connection;
+        return connection;
+    }
+
+    private async Task InitTerminalAsync()
     {
         var dims = await JS.InvokeAsync<TerminalDims>(
             "xtermBridge.init", _ref, "xterm-container");
 
         var console = AnsiConsole.Create(new AnsiConsoleSettings
         {
-            Ansi        = AnsiSupport.Yes,
+            Ansi = AnsiSupport.Yes,
             ColorSystem = ColorSystemSupport.TrueColor,
-            Out         = new AnsiConsoleOutput(_writer),
+            Out = new AnsiConsoleOutput(_writer),
             Interactive = InteractionSupport.No,
         });
-        console.Profile.Width  = dims.Cols;
+        console.Profile.Width = dims.Cols;
         console.Profile.Height = dims.Rows;
 
         _pumpTask = PumpOutputAsync();
 
-        var settings = await ConfigStore.LoadAsync(_cts.Token)
-            ?? throw new InvalidOperationException("No connection settings found.");
-
-        _connection = new BluKubeConnection(settings);
-        await _connection.ConnectAsync(_cts.Token);
-        _ = await _connection.CreateSessionAsync(_cts.Token);
-
+        var connection = await ConnectSessionAsync();
         _audioTask = PumpAudioAsync();
 
-        var vc = new ViewController(console, _keyInput, _connection, enableQuitKeys: false);
+        var vc = new ViewController(console, _keyInput, connection, enableQuitKeys: false);
         _viewTask = vc.RunAsync(_cts.Token);
     }
 
-    // ── JS invokable ─────────────────────────────────────────────────────────
+    private async Task InitNativeAsync()
+    {
+        ClearNativeBusy();
+        _nativeError = null;
+        ResetNativeState();
+
+        await ConnectSessionAsync();
+        _nativeStateTask = PumpNativeStatesAsync();
+        _audioTask = PumpAudioAsync();
+    }
 
     [JSInvokable]
-    public void OnXtermKey(string key, bool shift, bool ctrl) =>
-        _keyInput.Post(key, shift, ctrl);
+    public void OnXtermKey(string key, bool shift, bool ctrl, bool alt) =>
+        _keyInput.Post(key, shift, ctrl, alt);
 
-    // ── audio pump ───────────────────────────────────────────────────────
+    private async Task SearchNativeAsync()
+    {
+        if (_connection is null || string.IsNullOrWhiteSpace(_nativeQuery)) return;
+
+        SetNativeBusy("Searching...");
+        _nativeError = null;
+        _nativeResults = [];
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            var state = await _connection.SearchAsync(_nativeQuery.Trim(), 10, _cts.Token);
+            ApplyNativeState(state);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _nativeError = ex.Message;
+        }
+        finally
+        {
+            ClearNativeBusy();
+        }
+    }
+
+    private async Task PlayNativeAsync(MediaItem item)
+    {
+        if (_connection is null) return;
+
+        await ResumeAudioAsync();
+        SetNativeBusy("Loading track...");
+        _nativeError = null;
+        _nativeCurrentTitle = item.Title;
+        _nativeCurrentChannel = item.Channel;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            var state = await _connection.PlayAsync(ExtractVideoId(item.Url), _cts.Token);
+            ApplyNativeState(state);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _nativeError = ex.Message;
+        }
+        finally
+        {
+            ClearNativeBusy();
+        }
+    }
+
+    private async Task ToggleNativePlaybackAsync()
+    {
+        if (_connection is null || _nativeState is not PlaybackState playback) return;
+
+        await ResumeAudioAsync();
+        SetNativeBusy(playback.IsPlaying ? "Pausing..." : "Resuming...");
+        await InvokeAsync(StateHasChanged);
+        try
+        {
+            var state = playback.IsPlaying
+                ? await _connection.PauseAsync(_cts.Token)
+                : await _connection.ResumeAsync(_cts.Token);
+            ApplyNativeState(state);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _nativeError = ex.Message;
+        }
+        finally
+        {
+            ClearNativeBusy();
+        }
+    }
+
+    private async Task SeekNativeAsync(TimeSpan delta)
+    {
+        if (_connection is null || _nativeState is not PlaybackState playback) return;
+
+        var next = playback.Position + delta;
+        if (next < TimeSpan.Zero) next = TimeSpan.Zero;
+        if (playback.Duration > TimeSpan.Zero && next > playback.Duration) next = playback.Duration;
+
+        SetNativeBusy("Seeking...");
+        await InvokeAsync(StateHasChanged);
+        try
+        {
+            ApplyNativeState(await _connection.SeekToAsync(next, _cts.Token));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _nativeError = ex.Message;
+        }
+        finally
+        {
+            ClearNativeBusy();
+        }
+    }
+
+    private async Task SetNativeVolumeAsync(ChangeEventArgs args)
+    {
+        if (_connection is null) return;
+        if (!int.TryParse(args.Value?.ToString(), out var percent)) return;
+
+        try
+        {
+            ApplyNativeState(await _connection.SetVolumeAsync(Math.Clamp(percent, 0, 100) / 100f, _cts.Token));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _nativeError = ex.Message;
+        }
+    }
+
+    private async Task StopNativeAsync()
+    {
+        if (_connection is null) return;
+
+        SetNativeBusy("Stopping...");
+        await InvokeAsync(StateHasChanged);
+        try
+        {
+            ApplyNativeState(await _connection.StopAsync(_cts.Token));
+            _nativeCurrentTitle = null;
+            _nativeCurrentChannel = null;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _nativeError = ex.Message;
+        }
+        finally
+        {
+            ClearNativeBusy();
+        }
+    }
+
+    private async Task PumpNativeStatesAsync()
+    {
+        if (_connection is null) return;
+
+        try
+        {
+            await foreach (var state in _connection.StreamStatesAsync(_cts.Token))
+            {
+                ApplyNativeState(state);
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private void ApplyNativeState(SessionState state)
+    {
+        _nativeState = state;
+
+        switch (state)
+        {
+            case SearchResultsState results:
+                _nativeResults = results.Items;
+                _nativeError = results.Items.Count == 0 ? "No results." : null;
+                break;
+            case ErrorState error:
+                _nativeError = error.Message;
+                if (error.Previous is not null)
+                    _nativeState = error.Previous;
+                break;
+            default:
+                _nativeError = null;
+                break;
+        }
+    }
 
     private async Task PumpAudioAsync()
     {
@@ -258,14 +622,15 @@ else
             }
         }
         catch (OperationCanceledException) { }
-        catch (JSDisconnectedException)    { }
+        catch (JSDisconnectedException) { }
         catch (Exception ex)
         {
-            _writer.WriteLine($"\x1b[33maudio stopped: {ex.Message}\x1b[0m");
+            if (_clientView == ClientView.Terminal)
+                _writer.WriteLine($"\x1b[33maudio stopped: {ex.Message}\x1b[0m");
+            else
+                _nativeError = $"audio stopped: {ex.Message}";
         }
     }
-
-    // ── output pump ─────────────────────────────────────────────────────────
 
     private async Task PumpOutputAsync()
     {
@@ -275,23 +640,23 @@ else
                 await JS.InvokeVoidAsync("xtermBridge.write", _cts.Token, chunk);
         }
         catch (OperationCanceledException) { }
-        catch (JSDisconnectedException)    { }
+        catch (JSDisconnectedException) { }
     }
 
-    // ── disposal ─────────────────────────────────────────────────────────────
-
-    private async Task StopTerminalAsync()
+    private async Task StopClientAsync()
     {
         var connection = _connection;
         var viewTask = _viewTask;
         var pumpTask = _pumpTask;
         var audioTask = _audioTask;
+        var nativeStateTask = _nativeStateTask;
 
         try { await _cts.CancelAsync(); } catch { }
 
-        if (viewTask  is not null) try { await viewTask;  } catch { }
-        if (pumpTask  is not null) try { await pumpTask;  } catch { }
+        if (viewTask is not null) try { await viewTask; } catch { }
+        if (pumpTask is not null) try { await pumpTask; } catch { }
         if (audioTask is not null) try { await audioTask; } catch { }
+        if (nativeStateTask is not null) try { await nativeStateTask; } catch { }
 
         if (connection?.SessionId is Guid sessionId)
         {
@@ -308,6 +673,7 @@ else
         _viewTask = null;
         _pumpTask = null;
         _audioTask = null;
+        _nativeStateTask = null;
         _connection = null;
     }
 
@@ -316,9 +682,73 @@ else
         _keyInput.Complete();
         _ref?.Dispose();
         _writer.Dispose();
-        await StopTerminalAsync();
+        await StopClientAsync();
 
         _cts.Dispose();
+    }
+
+    private async Task ResumeAudioAsync()
+    {
+        try { await JS.InvokeVoidAsync("xtermBridge.resumeAudio"); } catch { }
+    }
+
+    private void ResetNativeState()
+    {
+        _nativeState = new IdleState();
+        _nativeResults = [];
+        _nativeError = null;
+        ClearNativeBusy();
+        _nativeCurrentTitle = null;
+        _nativeCurrentChannel = null;
+    }
+
+    private void SetNativeBusy(string message)
+    {
+        _nativeBusy = true;
+        _nativeBusyMessage = message;
+    }
+
+    private void ClearNativeBusy()
+    {
+        _nativeBusy = false;
+        _nativeBusyMessage = null;
+    }
+
+    private string ViewButtonClass(ClientView view) =>
+        _clientView == view ? "active" : string.Empty;
+
+    private static int ProgressValue(PlaybackState playback) =>
+        playback.Duration.TotalSeconds > 0
+            ? (int)Math.Round(Math.Clamp(playback.Position.TotalSeconds / playback.Duration.TotalSeconds, 0d, 1d) * 100)
+            : 0;
+
+    private static int VolumePercent(PlaybackState playback) =>
+        (int)Math.Round(Math.Clamp(playback.Volume, 0f, 1f) * 100);
+
+    private static string FormatTime(TimeSpan time) =>
+        time.TotalHours >= 1
+            ? $"{(int)time.TotalHours}:{time.Minutes:D2}:{time.Seconds:D2}"
+            : $"{time.Minutes}:{time.Seconds:D2}";
+
+    private static bool IsLiveDuration(TimeSpan duration) => duration <= TimeSpan.Zero;
+
+    private static string ExtractVideoId(string url)
+    {
+        if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
+        {
+            var query = uri.Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries);
+            foreach (var part in query)
+            {
+                var pair = part.Split('=', 2);
+                if (pair.Length == 2 && pair[0] == "v")
+                    return Uri.UnescapeDataString(pair[1]);
+            }
+
+            var segment = uri.Segments.LastOrDefault();
+            if (!string.IsNullOrEmpty(segment)) return segment.TrimEnd('/');
+        }
+
+        return url;
     }
 
     private sealed record TerminalDims(int Cols, int Rows);

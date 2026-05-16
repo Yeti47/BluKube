@@ -55,6 +55,7 @@ public sealed class ConsoleKeyInput : IKeyInput
     {
         var shift = (k.Modifiers & ConsoleModifiers.Shift) != 0;
         var ctrl = (k.Modifiers & ConsoleModifiers.Control) != 0;
+        var alt = (k.Modifiers & ConsoleModifiers.Alt) != 0;
         var key = k.Key switch
         {
             ConsoleKey.Spacebar => Key.Space,
@@ -69,6 +70,6 @@ public sealed class ConsoleKeyInput : IKeyInput
             _ when k.KeyChar != '\0' => Key.Char,
             _ => Key.Other,
         };
-        return new KeyPress(key, k.KeyChar, shift, ctrl);
+        return new KeyPress(key, k.KeyChar, shift, ctrl, alt);
     }
 }

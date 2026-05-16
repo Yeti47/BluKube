@@ -14,7 +14,7 @@ public interface IKeyInput
     IAsyncEnumerable<KeyPress> ReadKeysAsync(CancellationToken ct);
 }
 
-public readonly record struct KeyPress(Key Key, char Character, bool Shift, bool Ctrl);
+public readonly record struct KeyPress(Key Key, char Character, bool Shift, bool Ctrl, bool Alt);
 
 public enum Key
 {
