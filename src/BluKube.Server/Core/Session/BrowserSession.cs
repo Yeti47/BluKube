@@ -1,8 +1,8 @@
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
-using BluKube.Server.Core.Engine.Audio;
 using BluKube.Server.Core.Domain;
+using BluKube.Server.Core.Engine.Audio;
 
 namespace BluKube.Server.Core.Session;
 
@@ -29,13 +29,23 @@ public sealed class BrowserSession : IBrowserSession
 
     public SessionState Current
     {
-        get { lock (_stateLock) { return _current; } }
+        get
+        {
+            lock (_stateLock)
+            {
+                return _current;
+            }
+        }
     }
 
-    public DateTimeOffset LastActivityAt
-        => new(Interlocked.Read(ref _lastActivityTicks), TimeSpan.Zero);
+    public DateTimeOffset LastActivityAt =>
+        new(Interlocked.Read(ref _lastActivityTicks), TimeSpan.Zero);
 
-    public BrowserSession(IMediaPlayer player, IMediaSearch search, IAudioOutputDevice? audio = null)
+    public BrowserSession(
+        IMediaPlayer player,
+        IMediaSearch search,
+        IAudioOutputDevice? audio = null
+    )
     {
         _player = player;
         _search = search;
@@ -43,48 +53,77 @@ public sealed class BrowserSession : IBrowserSession
         _eventPump = Task.Run(PumpPlayerEventsAsync);
     }
 
-    public Task<SessionState> SearchAsync(string query, int limit, CancellationToken ct = default)
-        => RunAsync("search_failed", async linkedCt =>
-        {
-            var results = await _search.SearchAsync(query, limit, linkedCt);
-            return (SessionState)new SearchResultsState(query, results);
-        }, ct);
+    public Task<SessionState> SearchAsync(
+        string query,
+        int limit,
+        CancellationToken ct = default
+    ) =>
+        RunAsync(
+            "search_failed",
+            async linkedCt =>
+            {
+                var results = await _search.SearchAsync(query, limit, linkedCt);
+                return (SessionState)new SearchResultsState(query, results);
+            },
+            ct
+        );
 
-    public Task<SessionState> PlayAsync(string videoId, CancellationToken ct = default)
-        => RunAsync("play_failed", async linkedCt =>
-            (SessionState)ToPlaybackState(await _player.PlayAsync(videoId, linkedCt)), ct);
+    public Task<SessionState> PlayAsync(string videoId, CancellationToken ct = default) =>
+        RunAsync(
+            "play_failed",
+            async linkedCt =>
+                (SessionState)ToPlaybackState(await _player.PlayAsync(videoId, linkedCt)),
+            ct
+        );
 
-    public Task<SessionState> StopAsync(CancellationToken ct = default)
-        => RunAsync("stop_failed", async linkedCt =>
-        {
-            await _player.StopAsync(linkedCt);
-            return (SessionState)new IdleState();
-        }, ct);
+    public Task<SessionState> StopAsync(CancellationToken ct = default) =>
+        RunAsync(
+            "stop_failed",
+            async linkedCt =>
+            {
+                await _player.StopAsync(linkedCt);
+                return (SessionState)new IdleState();
+            },
+            ct
+        );
 
-    public Task<SessionState> PauseAsync(CancellationToken ct = default)
-        => RunAsync("pause_failed", async linkedCt =>
-            (SessionState)ToPlaybackState(await _player.PauseAsync(linkedCt)), ct);
+    public Task<SessionState> PauseAsync(CancellationToken ct = default) =>
+        RunAsync(
+            "pause_failed",
+            async linkedCt => (SessionState)ToPlaybackState(await _player.PauseAsync(linkedCt)),
+            ct
+        );
 
-    public Task<SessionState> ResumeAsync(CancellationToken ct = default)
-        => RunAsync("resume_failed", async linkedCt =>
-            (SessionState)ToPlaybackState(await _player.ResumeAsync(linkedCt)), ct);
+    public Task<SessionState> ResumeAsync(CancellationToken ct = default) =>
+        RunAsync(
+            "resume_failed",
+            async linkedCt => (SessionState)ToPlaybackState(await _player.ResumeAsync(linkedCt)),
+            ct
+        );
 
-    public Task<SessionState> SeekToAsync(TimeSpan position, CancellationToken ct = default)
-        => RunAsync("seek_failed", async linkedCt =>
-            (SessionState)ToPlaybackState(await _player.SeekToAsync(position, linkedCt)), ct);
+    public Task<SessionState> SeekToAsync(TimeSpan position, CancellationToken ct = default) =>
+        RunAsync(
+            "seek_failed",
+            async linkedCt =>
+                (SessionState)ToPlaybackState(await _player.SeekToAsync(position, linkedCt)),
+            ct
+        );
 
-    public Task<SessionState> SetVolumeAsync(float volume, CancellationToken ct = default)
-        => RunAsync("volume_failed", async linkedCt =>
-            (SessionState)ToPlaybackState(await _player.SetVolumeAsync(volume, linkedCt)), ct);
+    public Task<SessionState> SetVolumeAsync(float volume, CancellationToken ct = default) =>
+        RunAsync(
+            "volume_failed",
+            async linkedCt =>
+                (SessionState)ToPlaybackState(await _player.SetVolumeAsync(volume, linkedCt)),
+            ct
+        );
 
     public async IAsyncEnumerable<SessionState> States(
-        [EnumeratorCancellation] CancellationToken ct = default)
+        [EnumeratorCancellation] CancellationToken ct = default
+    )
     {
-        var channel = Channel.CreateUnbounded<SessionState>(new UnboundedChannelOptions
-        {
-            SingleReader = true,
-            SingleWriter = false
-        });
+        var channel = Channel.CreateUnbounded<SessionState>(
+            new UnboundedChannelOptions { SingleReader = true, SingleWriter = false }
+        );
         var key = Guid.NewGuid();
         _subscribers[key] = channel;
         Touch();
@@ -107,7 +146,8 @@ public sealed class BrowserSession : IBrowserSession
     }
 
     public async IAsyncEnumerable<byte[]> AudioFrames(
-        [EnumeratorCancellation] CancellationToken ct = default)
+        [EnumeratorCancellation] CancellationToken ct = default
+    )
     {
         if (_audio is null)
         {
@@ -125,7 +165,8 @@ public sealed class BrowserSession : IBrowserSession
     private async Task<SessionState> RunAsync(
         string errorCode,
         Func<CancellationToken, Task<SessionState>> action,
-        CancellationToken ct)
+        CancellationToken ct
+    )
     {
         Touch();
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, _disposeCts.Token);
@@ -164,18 +205,20 @@ public sealed class BrowserSession : IBrowserSession
                 }
             }
         }
-        catch (OperationCanceledException) { /* dispose */ }
+        catch (OperationCanceledException)
+        { /* dispose */
+        }
         catch (Exception ex)
         {
             Publish(new ErrorState("event_pump_failed", ex.Message, Current));
         }
     }
 
-    private static PlaybackState ToPlaybackState(PlayerSnapshot s)
-        => new(s.VideoId, s.Position, s.Duration, s.IsPlaying, s.Volume);
+    private static PlaybackState ToPlaybackState(PlayerSnapshot s) =>
+        new(s.VideoId, s.Position, s.Duration, s.IsPlaying, s.Volume);
 
-    private void Touch()
-        => Interlocked.Exchange(ref _lastActivityTicks, DateTimeOffset.UtcNow.UtcTicks);
+    private void Touch() =>
+        Interlocked.Exchange(ref _lastActivityTicks, DateTimeOffset.UtcNow.UtcTicks);
 
     private void Publish(SessionState state)
     {
@@ -192,7 +235,11 @@ public sealed class BrowserSession : IBrowserSession
 
     public async ValueTask DisposeAsync()
     {
-        try { _disposeCts.Cancel(); } catch { }
+        try
+        {
+            _disposeCts.Cancel();
+        }
+        catch { }
 
         foreach (var sub in _subscribers.Values)
         {
@@ -202,14 +249,26 @@ public sealed class BrowserSession : IBrowserSession
 
         if (_eventPump is { } pump)
         {
-            try { await pump; } catch { }
+            try
+            {
+                await pump;
+            }
+            catch { }
             _eventPump = null;
         }
 
-        try { await _player.DisposeAsync(); } catch { }
+        try
+        {
+            await _player.DisposeAsync();
+        }
+        catch { }
         if (_audio is not null)
         {
-            try { await _audio.DisposeAsync(); } catch { }
+            try
+            {
+                await _audio.DisposeAsync();
+            }
+            catch { }
         }
 
         _disposeCts.Dispose();

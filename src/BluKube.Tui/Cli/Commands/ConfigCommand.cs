@@ -4,14 +4,16 @@ using Spectre.Console.Cli;
 
 namespace BluKube.Tui.Cli.Commands;
 
-public sealed class ConfigCommand(
-    FileConfigStore store,
-    IAnsiConsole console) : Command<ConfigCommand.Settings>
+public sealed class ConfigCommand(FileConfigStore store, IAnsiConsole console)
+    : Command<ConfigCommand.Settings>
 {
     public sealed class Settings : CommandSettings
     {
-        [CommandOption("--show")] public bool Show { get; init; }
-        [CommandOption("--clear")] public bool Clear { get; init; }
+        [CommandOption("--show")]
+        public bool Show { get; init; }
+
+        [CommandOption("--clear")]
+        public bool Clear { get; init; }
     }
 
     public override int Execute(CommandContext context, Settings s)
@@ -30,7 +32,9 @@ public sealed class ConfigCommand(
         else
         {
             console.MarkupLine($"[grey]server:[/] {current.ServerUrl}");
-            console.MarkupLine($"[grey]token:[/]  {(string.IsNullOrEmpty(current.Token) ? "(none)" : "***")}");
+            console.MarkupLine(
+                $"[grey]token:[/]  {(string.IsNullOrEmpty(current.Token) ? "(none)" : "***")}"
+            );
         }
         return 0;
     }

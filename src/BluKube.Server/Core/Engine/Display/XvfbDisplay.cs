@@ -24,7 +24,8 @@ public sealed class XvfbDisplay : IDisplay
 
     public async ValueTask DisposeAsync()
     {
-        if (_disposed) return;
+        if (_disposed)
+            return;
         _disposed = true;
 
         try

@@ -10,13 +10,12 @@ namespace BluKube.Tui.Input;
 public sealed class ConsoleKeyInput : IKeyInput
 {
     public async IAsyncEnumerable<KeyPress> ReadKeysAsync(
-        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct
+    )
     {
-        var ch = Channel.CreateUnbounded<KeyPress>(new UnboundedChannelOptions
-        {
-            SingleReader = true,
-            SingleWriter = true,
-        });
+        var ch = Channel.CreateUnbounded<KeyPress>(
+            new UnboundedChannelOptions { SingleReader = true, SingleWriter = true }
+        );
 
         var reader = new Thread(() =>
         {
@@ -33,9 +32,18 @@ public sealed class ConsoleKeyInput : IKeyInput
                     ch.Writer.TryWrite(Translate(raw));
                 }
             }
-            catch (InvalidOperationException) { /* redirected console */ }
-            finally { ch.Writer.TryComplete(); }
-        }) { IsBackground = true, Name = "blukube-input" };
+            catch (InvalidOperationException)
+            { /* redirected console */
+            }
+            finally
+            {
+                ch.Writer.TryComplete();
+            }
+        })
+        {
+            IsBackground = true,
+            Name = "blukube-input",
+        };
         reader.Start();
 
         try

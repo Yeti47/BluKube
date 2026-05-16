@@ -43,6 +43,7 @@ project.lock.json
 # ---- Local tool / cache dirs ----
 .dotnet/
 .local/
+node_modules/
 
 # ---- Playwright ----
 .playwright/

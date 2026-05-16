@@ -13,10 +13,11 @@ public sealed class AudioPlayer : IAsyncDisposable
     private const int BufferCount = 6; // 6 * 20 ms = 120 ms of pre-roll
 
     private readonly IOpusDecoder _decoder = OpusCodecFactory.CreateDecoder(
-        AudioFormat.SampleRate, AudioFormat.Channels);
+        AudioFormat.SampleRate,
+        AudioFormat.Channels
+    );
 
-    private readonly short[] _pcm = new short[
-        AudioFormat.SamplesPerFrame * AudioFormat.Channels];
+    private readonly short[] _pcm = new short[AudioFormat.SamplesPerFrame * AudioFormat.Channels];
 
     private ALContext? _alc;
     private AL? _al;
@@ -27,13 +28,15 @@ public sealed class AudioPlayer : IAsyncDisposable
 
     public unsafe void Open()
     {
-        if (_al is not null) return;
+        if (_al is not null)
+            return;
 
         _alc = ALContext.GetApi(soft: false);
         _al = AL.GetApi(soft: false);
 
         _device = _alc.OpenDevice(string.Empty);
-        if (_device is null) throw new InvalidOperationException("OpenAL: cannot open default device");
+        if (_device is null)
+            throw new InvalidOperationException("OpenAL: cannot open default device");
 
         _context = _alc.CreateContext(_device, null);
         _alc.MakeContextCurrent(_context);
@@ -72,9 +75,13 @@ public sealed class AudioPlayer : IAsyncDisposable
     {
         fixed (short* p = _pcm)
         {
-            al.BufferData(bufferId, BufferFormat.Stereo16, p,
+            al.BufferData(
+                bufferId,
+                BufferFormat.Stereo16,
+                p,
                 decodedSamples * AudioFormat.Channels * sizeof(short),
-                AudioFormat.SampleRate);
+                AudioFormat.SampleRate
+            );
         }
     }
 
@@ -84,7 +91,8 @@ public sealed class AudioPlayer : IAsyncDisposable
         var al = _al!;
 
         var buffers = new uint[BufferCount];
-        for (int i = 0; i < BufferCount; i++) buffers[i] = al.GenBuffer();
+        for (int i = 0; i < BufferCount; i++)
+            buffers[i] = al.GenBuffer();
 
         var queue = new Queue<uint>(buffers);
         bool started = false;
@@ -102,14 +110,16 @@ public sealed class AudioPlayer : IAsyncDisposable
                 {
                     continue; // skip malformed packet
                 }
-                if (decoded <= 0) continue;
+                if (decoded <= 0)
+                    continue;
 
                 // Recycle any processed buffers back into the queue.
                 al.GetSourceProperty(_source, GetSourceInteger.BuffersProcessed, out int processed);
                 while (processed-- > 0)
                 {
                     uint released = UnqueueOneBuffer(al);
-                    if (released != 0) queue.Enqueue(released);
+                    if (released != 0)
+                        queue.Enqueue(released);
                 }
 
                 if (queue.Count == 0)
@@ -120,9 +130,11 @@ public sealed class AudioPlayer : IAsyncDisposable
                     while (processed-- > 0)
                     {
                         uint released = UnqueueOneBuffer(al);
-                        if (released != 0) queue.Enqueue(released);
+                        if (released != 0)
+                            queue.Enqueue(released);
                     }
-                    if (queue.Count == 0) continue; // drop frame to avoid stall
+                    if (queue.Count == 0)
+                        continue; // drop frame to avoid stall
                 }
 
                 var buf = queue.Dequeue();
@@ -138,13 +150,18 @@ public sealed class AudioPlayer : IAsyncDisposable
                 {
                     // Restart if the source ran dry between packets.
                     al.GetSourceProperty(_source, GetSourceInteger.SourceState, out int state);
-                    if (state != (int)SourceState.Playing) al.SourcePlay(_source);
+                    if (state != (int)SourceState.Playing)
+                        al.SourcePlay(_source);
                 }
             }
         }
         finally
         {
-            try { al.SourceStop(_source); } catch { }
+            try
+            {
+                al.SourceStop(_source);
+            }
+            catch { }
             try
             {
                 al.GetSourceProperty(_source, GetSourceInteger.BuffersQueued, out int queued);
@@ -158,14 +175,19 @@ public sealed class AudioPlayer : IAsyncDisposable
             catch { }
             foreach (var b in buffers)
             {
-                try { al.DeleteBuffer(b); } catch { }
+                try
+                {
+                    al.DeleteBuffer(b);
+                }
+                catch { }
             }
         }
     }
 
     public unsafe ValueTask DisposeAsync()
     {
-        if (_disposed) return ValueTask.CompletedTask;
+        if (_disposed)
+            return ValueTask.CompletedTask;
         _disposed = true;
 
         try
@@ -197,7 +219,11 @@ public sealed class AudioPlayer : IAsyncDisposable
 
         _al?.Dispose();
         _alc?.Dispose();
-        try { _decoder.Dispose(); } catch { }
+        try
+        {
+            _decoder.Dispose();
+        }
+        catch { }
         return ValueTask.CompletedTask;
     }
 }

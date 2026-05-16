@@ -12,14 +12,15 @@ public sealed class ClientSessionService(IConfigStore configStore) : IAsyncDispo
     public async Task<bool> HasSavedSettingsAsync() =>
         await configStore.LoadAsync(Token) is not null;
 
-    public Task ClearSettingsAsync() =>
-        configStore.ClearAsync(CancellationToken.None);
+    public Task ClearSettingsAsync() => configStore.ClearAsync(CancellationToken.None);
 
     public async Task<BluKubeConnection> ConnectAsync()
     {
-        if (Connection is not null) return Connection;
+        if (Connection is not null)
+            return Connection;
 
-        var settings = await configStore.LoadAsync(Token)
+        var settings =
+            await configStore.LoadAsync(Token)
             ?? throw new InvalidOperationException("No connection settings found.");
 
         var connection = new BluKubeConnection(settings);
@@ -31,23 +32,40 @@ public sealed class ClientSessionService(IConfigStore configStore) : IAsyncDispo
 
     public async Task StopAsync(params Task?[] tasks)
     {
-        try { await _cts.CancelAsync(); } catch { }
+        try
+        {
+            await _cts.CancelAsync();
+        }
+        catch { }
 
         foreach (var task in tasks)
         {
-            if (task is null) continue;
-            try { await task; } catch { }
+            if (task is null)
+                continue;
+            try
+            {
+                await task;
+            }
+            catch { }
         }
 
         var connection = Connection;
         if (connection?.SessionId is Guid sessionId)
         {
-            try { await connection.CloseSessionAsync(sessionId, CancellationToken.None); } catch { }
+            try
+            {
+                await connection.CloseSessionAsync(sessionId, CancellationToken.None);
+            }
+            catch { }
         }
 
         if (connection is not null)
         {
-            try { await connection.DisposeAsync(); } catch { }
+            try
+            {
+                await connection.DisposeAsync();
+            }
+            catch { }
         }
 
         Connection = null;

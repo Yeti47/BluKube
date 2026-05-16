@@ -9,26 +9,20 @@ public sealed class BraveYouTubeBrowserLauncher : IYouTubeBrowserLauncher
     [
         "/usr/bin/brave-browser",
         "/usr/bin/brave",
-        "/opt/brave.com/brave/brave-browser"
+        "/opt/brave.com/brave/brave-browser",
     ];
 
     private readonly string _bravePathOverride;
     private readonly IBraveProfileProvisioner _profiles;
 
     public BraveYouTubeBrowserLauncher()
-        : this(new BraveProfileProvisioner(), "")
-    {
-    }
+        : this(new BraveProfileProvisioner(), "") { }
 
     public BraveYouTubeBrowserLauncher(string bravePathOverride)
-        : this(new BraveProfileProvisioner(), bravePathOverride)
-    {
-    }
+        : this(new BraveProfileProvisioner(), bravePathOverride) { }
 
     public BraveYouTubeBrowserLauncher(IBraveProfileProvisioner profiles)
-        : this(profiles, "")
-    {
-    }
+        : this(profiles, "") { }
 
     private BraveYouTubeBrowserLauncher(IBraveProfileProvisioner profiles, string bravePathOverride)
     {
@@ -36,7 +30,11 @@ public sealed class BraveYouTubeBrowserLauncher : IYouTubeBrowserLauncher
         _bravePathOverride = bravePathOverride;
     }
 
-    public async Task<IYouTubeBrowser> LaunchAsync(IDisplay display, string? pulseSink, CancellationToken cancellationToken)
+    public async Task<IYouTubeBrowser> LaunchAsync(
+        IDisplay display,
+        string? pulseSink,
+        CancellationToken cancellationToken
+    )
     {
         var bravePath = ResolveBravePath();
         var playwright = await Playwright.CreateAsync();
@@ -48,41 +46,45 @@ public sealed class BraveYouTubeBrowserLauncher : IYouTubeBrowserLauncher
             var braveEnv = InheritAndPatchEnvironment(display, pulseSink);
             profile = await _profiles.CreateAsync(cancellationToken);
 
-            context = await playwright.Chromium.LaunchPersistentContextAsync(profile.ProfilePath, new BrowserTypeLaunchPersistentContextOptions
-            {
-                Headless = false,
-                ExecutablePath = bravePath,
-                Env = braveEnv,
-                IgnoreDefaultArgs =
-                [
-                    "--disable-background-networking",
-                    "--disable-component-extensions-with-background-pages",
-                    "--disable-component-update",
-                    "--disable-extensions"
-                ],
-                Args =
-                [
-                    "--ozone-platform=x11",
-                    "--autoplay-policy=no-user-gesture-required",
-                    "--disable-blink-features=AutomationControlled",
-                    "--disable-dev-shm-usage",
-                    "--no-sandbox",
-                    "--disable-background-media-suspend",
-                    "--disable-background-timer-throttling",
-                    "--disable-renderer-backgrounding",
-                    "--disable-backgrounding-occluded-windows",
-                    "--disable-features=MediaSessionService,IntensiveWakeUpThrottling,CalculateNativeWinOcclusion"
-                ],
-                UserAgent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) " +
-                            "Chrome/124.0.0.0 Safari/537.36",
-                Locale = "en-US",
-                TimezoneId = "Etc/UTC",
-                ExtraHTTPHeaders = new Dictionary<string, string>
+            context = await playwright.Chromium.LaunchPersistentContextAsync(
+                profile.ProfilePath,
+                new BrowserTypeLaunchPersistentContextOptions
                 {
-                    ["Accept-Language"] = "en-US,en;q=0.9"
-                },
-                ViewportSize = new ViewportSize { Width = 1280, Height = 720 }
-            });
+                    Headless = false,
+                    ExecutablePath = bravePath,
+                    Env = braveEnv,
+                    IgnoreDefaultArgs =
+                    [
+                        "--disable-background-networking",
+                        "--disable-component-extensions-with-background-pages",
+                        "--disable-component-update",
+                        "--disable-extensions",
+                    ],
+                    Args =
+                    [
+                        "--ozone-platform=x11",
+                        "--autoplay-policy=no-user-gesture-required",
+                        "--disable-blink-features=AutomationControlled",
+                        "--disable-dev-shm-usage",
+                        "--no-sandbox",
+                        "--disable-background-media-suspend",
+                        "--disable-background-timer-throttling",
+                        "--disable-renderer-backgrounding",
+                        "--disable-backgrounding-occluded-windows",
+                        "--disable-features=MediaSessionService,IntensiveWakeUpThrottling,CalculateNativeWinOcclusion",
+                    ],
+                    UserAgent =
+                        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
+                        + "Chrome/124.0.0.0 Safari/537.36",
+                    Locale = "en-US",
+                    TimezoneId = "Etc/UTC",
+                    ExtraHTTPHeaders = new Dictionary<string, string>
+                    {
+                        ["Accept-Language"] = "en-US,en;q=0.9",
+                    },
+                    ViewportSize = new ViewportSize { Width = 1280, Height = 720 },
+                }
+            );
 
             await ApplyConsentCookieAsync(context);
 
@@ -98,7 +100,11 @@ public sealed class BraveYouTubeBrowserLauncher : IYouTubeBrowserLauncher
         {
             if (context is not null)
             {
-                try { await context.CloseAsync(); } catch { }
+                try
+                {
+                    await context.CloseAsync();
+                }
+                catch { }
             }
             playwright.Dispose();
             if (profile is not null)
@@ -124,7 +130,8 @@ public sealed class BraveYouTubeBrowserLauncher : IYouTubeBrowserLauncher
 
         return KnownBravePaths.FirstOrDefault(File.Exists)
             ?? throw new InvalidOperationException(
-                "Unable to find Brave executable. Set BRAVE_EXECUTABLE_PATH.");
+                "Unable to find Brave executable. Set BRAVE_EXECUTABLE_PATH."
+            );
     }
 
     private static async Task<IPage> PrepareSinglePageAsync(IBrowserContext context)
@@ -132,13 +139,19 @@ public sealed class BraveYouTubeBrowserLauncher : IYouTubeBrowserLauncher
         var page = context.Pages.FirstOrDefault() ?? await context.NewPageAsync();
         foreach (var extraPage in context.Pages.Where(p => p != page).ToArray())
         {
-            try { await extraPage.CloseAsync(new PageCloseOptions { RunBeforeUnload = false }); }
+            try
+            {
+                await extraPage.CloseAsync(new PageCloseOptions { RunBeforeUnload = false });
+            }
             catch { }
         }
         return page;
     }
 
-    private static Dictionary<string, string> InheritAndPatchEnvironment(IDisplay display, string? pulseSink)
+    private static Dictionary<string, string> InheritAndPatchEnvironment(
+        IDisplay display,
+        string? pulseSink
+    )
     {
         var env = new Dictionary<string, string>(StringComparer.Ordinal);
 
@@ -163,8 +176,7 @@ public sealed class BraveYouTubeBrowserLauncher : IYouTubeBrowserLauncher
     }
 
     private static Task ApplyConsentCookieAsync(IBrowserContext context) =>
-        context.AddCookiesAsync(
-        [
+        context.AddCookiesAsync([
             ConsentCookie(".youtube.com"),
             ConsentCookie(".google.com"),
             ConsentCookie(".google.de"),
@@ -175,19 +187,20 @@ public sealed class BraveYouTubeBrowserLauncher : IYouTubeBrowserLauncher
                 Domain = ".youtube.com",
                 Path = "/",
                 Secure = true,
-                SameSite = SameSiteAttribute.Lax
-            }
+                SameSite = SameSiteAttribute.Lax,
+            },
         ]);
 
-    private static Cookie ConsentCookie(string domain) => new()
-    {
-        Name = "CONSENT",
-        Value = "YES+cb.20210328-17-p0.en+FX+471",
-        Domain = domain,
-        Path = "/",
-        Secure = true,
-        SameSite = SameSiteAttribute.None
-    };
+    private static Cookie ConsentCookie(string domain) =>
+        new()
+        {
+            Name = "CONSENT",
+            Value = "YES+cb.20210328-17-p0.en+FX+471",
+            Domain = domain,
+            Path = "/",
+            Secure = true,
+            SameSite = SameSiteAttribute.None,
+        };
 
     private static async Task ApplyAntiDetectionScriptAsync(IBrowserContext context)
     {
@@ -199,6 +212,7 @@ public sealed class BraveYouTubeBrowserLauncher : IYouTubeBrowserLauncher
               document.addEventListener('visibilitychange', event => event.stopImmediatePropagation(), true);
               Object.defineProperty(navigator, 'webdriver', { configurable: true, get: () => undefined });
             }
-            """);
+            """
+        );
     }
 }

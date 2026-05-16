@@ -8,8 +8,13 @@ namespace BluKube.Tui.Rendering;
 internal sealed class PlaybackViewController(BluKubeConnection connection) : IView
 {
     public ViewMode Mode => ViewMode.Player;
-    
-    public async Task DispatchAsync(KeyPress key, UiState state, Channel<bool> redraw, CancellationToken ct)
+
+    public async Task DispatchAsync(
+        KeyPress key,
+        UiState state,
+        Channel<bool> redraw,
+        CancellationToken ct
+    )
     {
         if (key.IsAltCharacter('c'))
         {
@@ -27,14 +32,18 @@ internal sealed class PlaybackViewController(BluKubeConnection connection) : IVi
             return;
         }
 
-        if (state.ServerState is not PlaybackState playback) return;
+        if (state.ServerState is not PlaybackState playback)
+            return;
 
         switch (key.Key)
         {
             case Key.Space:
                 // Optimistic UI: flip the playing flag immediately, then confirm
                 // with the server response.
-                state.ServerState = playback with { IsPlaying = !playback.IsPlaying };
+                state.ServerState = playback with
+                {
+                    IsPlaying = !playback.IsPlaying,
+                };
                 await redraw.Writer.WriteAsync(true, ct);
                 state.ServerState = playback.IsPlaying
                     ? await connection.PauseAsync(ct)
@@ -48,15 +57,32 @@ internal sealed class PlaybackViewController(BluKubeConnection connection) : IVi
                 await SetVolumeAsync(state, playback.Volume - 0.05f, redraw, ct);
                 break;
             case Key.LeftArrow:
-                await SeekAsync(state, playback, -TimeSpan.FromSeconds(key.Shift ? 30 : 10), redraw, ct);
+                await SeekAsync(
+                    state,
+                    playback,
+                    -TimeSpan.FromSeconds(key.Shift ? 30 : 10),
+                    redraw,
+                    ct
+                );
                 break;
             case Key.RightArrow:
-                await SeekAsync(state, playback, TimeSpan.FromSeconds(key.Shift ? 30 : 10), redraw, ct);
+                await SeekAsync(
+                    state,
+                    playback,
+                    TimeSpan.FromSeconds(key.Shift ? 30 : 10),
+                    redraw,
+                    ct
+                );
                 break;
         }
     }
 
-    private async Task SetVolumeAsync(UiState state, float volume, Channel<bool> redraw, CancellationToken ct)
+    private async Task SetVolumeAsync(
+        UiState state,
+        float volume,
+        Channel<bool> redraw,
+        CancellationToken ct
+    )
     {
         state.ServerState = await connection.SetVolumeAsync(Math.Clamp(volume, 0f, 1f), ct);
         await redraw.Writer.WriteAsync(true, ct);
@@ -67,11 +93,14 @@ internal sealed class PlaybackViewController(BluKubeConnection connection) : IVi
         PlaybackState playback,
         TimeSpan delta,
         Channel<bool> redraw,
-        CancellationToken ct)
+        CancellationToken ct
+    )
     {
         var next = playback.Position + delta;
-        if (next < TimeSpan.Zero) next = TimeSpan.Zero;
-        if (playback.Duration > TimeSpan.Zero && next > playback.Duration) next = playback.Duration;
+        if (next < TimeSpan.Zero)
+            next = TimeSpan.Zero;
+        if (playback.Duration > TimeSpan.Zero && next > playback.Duration)
+            next = playback.Duration;
 
         state.ServerState = await connection.SeekToAsync(next, ct);
         await redraw.Writer.WriteAsync(true, ct);

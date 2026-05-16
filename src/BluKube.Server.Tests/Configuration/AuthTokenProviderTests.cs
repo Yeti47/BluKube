@@ -16,7 +16,8 @@ public sealed class AuthTokenProviderTests
         {
             var provider = new AuthTokenProvider(
                 Options.Create(new AuthOptions { TokenFile = file }),
-                NullLogger<AuthTokenProvider>.Instance);
+                NullLogger<AuthTokenProvider>.Instance
+            );
 
             Assert.False(File.Exists(file));
 
@@ -28,7 +29,8 @@ public sealed class AuthTokenProviderTests
         }
         finally
         {
-            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
         }
     }
 
@@ -44,19 +46,19 @@ public sealed class AuthTokenProviderTests
             File.WriteAllText(file, "file-token");
 
             var provider = new AuthTokenProvider(
-                Options.Create(new AuthOptions
-                {
-                    Token = "  configured-token  ",
-                    TokenFile = file,
-                }),
-                NullLogger<AuthTokenProvider>.Instance);
+                Options.Create(
+                    new AuthOptions { Token = "  configured-token  ", TokenFile = file }
+                ),
+                NullLogger<AuthTokenProvider>.Instance
+            );
 
             Assert.Equal("configured-token", provider.Token);
             Assert.Equal("file-token", File.ReadAllText(file));
         }
         finally
         {
-            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
         }
     }
 }

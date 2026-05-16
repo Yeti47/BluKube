@@ -13,7 +13,8 @@ internal sealed class ResultsTable(
     int selectedIndex,
     bool isLoading,
     string query,
-    string? pageInfo = null) : IRenderable
+    string? pageInfo = null
+) : IRenderable
 {
     private IRenderable Build()
     {
@@ -22,7 +23,8 @@ internal sealed class ResultsTable(
 
         // Width(1) pins the selector column so it never collapses to zero
         // when all selector cells are empty (e.g. during loading).
-        var table = new Table().Border(TableBorder.Rounded)
+        var table = new Table()
+            .Border(TableBorder.Rounded)
             .AddColumn(new TableColumn(string.Empty).Width(1))
             .AddColumn("Title")
             .AddColumn("Channel")
@@ -38,9 +40,14 @@ internal sealed class ResultsTable(
                     new Markup(string.Empty),
                     i == midRow
                         ? new Markup("[bold white on blue] Loading... [/]")
-                        : new SanitizedText(item.Title, maxLength: 60, style: SanitizedTextStyle.Dim),
+                        : new SanitizedText(
+                            item.Title,
+                            maxLength: 60,
+                            style: SanitizedTextStyle.Dim
+                        ),
                     new SanitizedText(item.Channel, style: SanitizedTextStyle.Dim),
-                    new DurationLabel(item.Duration, dim: true));
+                    new DurationLabel(item.Duration, dim: true)
+                );
             }
         }
         else
@@ -54,11 +61,14 @@ internal sealed class ResultsTable(
                     new SanitizedText(
                         item.Title,
                         maxLength: 60,
-                        style: selected ? SanitizedTextStyle.Selected : SanitizedTextStyle.Plain),
+                        style: selected ? SanitizedTextStyle.Selected : SanitizedTextStyle.Plain
+                    ),
                     new SanitizedText(
                         item.Channel,
-                        style: selected ? SanitizedTextStyle.Selected : SanitizedTextStyle.Plain),
-                    new DurationLabel(item.Duration, selected));
+                        style: selected ? SanitizedTextStyle.Selected : SanitizedTextStyle.Plain
+                    ),
+                    new DurationLabel(item.Duration, selected)
+                );
             }
         }
 

@@ -16,12 +16,14 @@ public sealed class LocalStorageConfigStore(IJSRuntime js) : IConfigStore
     public async Task<ConnectionSettings?> LoadAsync(CancellationToken ct = default)
     {
         var json = await js.InvokeAsync<string?>("bluKubeStorage.load", ct, Key);
-        if (string.IsNullOrWhiteSpace(json)) return null;
+        if (string.IsNullOrWhiteSpace(json))
+            return null;
 
         try
         {
             var dto = JsonSerializer.Deserialize<Dto>(json);
-            if (dto is null || string.IsNullOrWhiteSpace(dto.ServerUrl)) return null;
+            if (dto is null || string.IsNullOrWhiteSpace(dto.ServerUrl))
+                return null;
             return new ConnectionSettings(new Uri(dto.ServerUrl), dto.Token);
         }
         catch (JsonException)
@@ -32,8 +34,7 @@ public sealed class LocalStorageConfigStore(IJSRuntime js) : IConfigStore
 
     public async Task SaveAsync(ConnectionSettings settings, CancellationToken ct = default)
     {
-        var json = JsonSerializer.Serialize(
-            new Dto(settings.ServerUrl.ToString(), settings.Token));
+        var json = JsonSerializer.Serialize(new Dto(settings.ServerUrl.ToString(), settings.Token));
         await js.InvokeVoidAsync("bluKubeStorage.save", ct, Key, json);
     }
 

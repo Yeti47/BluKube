@@ -9,7 +9,12 @@ internal sealed class SearchViewController(BluKubeConnection connection, int lim
 {
     public ViewMode Mode => ViewMode.Search;
 
-    public async Task DispatchAsync(KeyPress key, UiState state, Channel<bool> redraw, CancellationToken ct)
+    public async Task DispatchAsync(
+        KeyPress key,
+        UiState state,
+        Channel<bool> redraw,
+        CancellationToken ct
+    )
     {
         switch (key.Key)
         {

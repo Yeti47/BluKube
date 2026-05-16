@@ -11,12 +11,9 @@ namespace BluKube.Server.Tests.Core.Session;
 /// </summary>
 internal sealed class FakeMediaPlayer : IMediaPlayer, IMediaSearch
 {
-    private readonly Channel<PlaybackEvent> _events =
-        Channel.CreateUnbounded<PlaybackEvent>(new UnboundedChannelOptions
-        {
-            SingleReader = true,
-            SingleWriter = false
-        });
+    private readonly Channel<PlaybackEvent> _events = Channel.CreateUnbounded<PlaybackEvent>(
+        new UnboundedChannelOptions { SingleReader = true, SingleWriter = false }
+    );
 
     public List<string> Commands { get; } = new();
 
@@ -90,7 +87,8 @@ internal sealed class FakeMediaPlayer : IMediaPlayer, IMediaSearch
     }
 
     public async IAsyncEnumerable<PlaybackEvent> Events(
-        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct
+    )
     {
         await foreach (var ev in _events.Reader.ReadAllAsync(ct))
         {
@@ -108,7 +106,8 @@ internal sealed class FakeMediaPlayer : IMediaPlayer, IMediaSearch
     private void ThrowIfPending()
     {
         var ex = ThrowOnNext;
-        if (ex is null) return;
+        if (ex is null)
+            return;
         ThrowOnNext = null;
         throw ex;
     }

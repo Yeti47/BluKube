@@ -9,14 +9,15 @@ internal enum SanitizedTextStyle
 {
     Plain,
     Dim,
-    Selected
+    Selected,
 }
 
 internal sealed class SanitizedText(
     string? value,
     int? maxLength = null,
     SanitizedTextStyle style = SanitizedTextStyle.Plain,
-    string? fallback = null) : IRenderable
+    string? fallback = null
+) : IRenderable
 {
     private IRenderable Build()
     {
@@ -31,7 +32,7 @@ internal sealed class SanitizedText(
         {
             SanitizedTextStyle.Dim => new Markup($"[grey]{escaped}[/]"),
             SanitizedTextStyle.Selected => new Markup($"[bold blue]{escaped}[/]"),
-            _ => new Markup(escaped)
+            _ => new Markup(escaped),
         };
     }
 
@@ -93,8 +94,9 @@ internal sealed class SanitizedText(
         if (rune.Value is 0x200D or 0x20E3 or 0xFE0E or 0xFE0F)
             return true;
 
-        return Rune.GetUnicodeCategory(rune) is UnicodeCategory.OtherSymbol
-            or UnicodeCategory.ModifierSymbol;
+        return Rune.GetUnicodeCategory(rune)
+            is UnicodeCategory.OtherSymbol
+                or UnicodeCategory.ModifierSymbol;
     }
 
     private static bool IsTerminalSpacingRune(Rune rune)
@@ -102,9 +104,10 @@ internal sealed class SanitizedText(
         if (rune.Value <= char.MaxValue && char.IsWhiteSpace((char)rune.Value))
             return true;
 
-        return Rune.GetUnicodeCategory(rune) is UnicodeCategory.SpaceSeparator
-            or UnicodeCategory.LineSeparator
-            or UnicodeCategory.ParagraphSeparator
-            or UnicodeCategory.Control;
+        return Rune.GetUnicodeCategory(rune)
+            is UnicodeCategory.SpaceSeparator
+                or UnicodeCategory.LineSeparator
+                or UnicodeCategory.ParagraphSeparator
+                or UnicodeCategory.Control;
     }
 }

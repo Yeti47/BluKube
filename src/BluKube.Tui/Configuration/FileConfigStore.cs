@@ -14,10 +14,12 @@ public sealed class FileConfigStore(string? overridePath = null) : IConfigStore
 
     public async Task<ConnectionSettings?> LoadAsync(CancellationToken ct = default)
     {
-        if (!File.Exists(_path)) return null;
+        if (!File.Exists(_path))
+            return null;
         await using var fs = File.OpenRead(_path);
         var dto = await JsonSerializer.DeserializeAsync<Dto>(fs, cancellationToken: ct);
-        if (dto is null || string.IsNullOrWhiteSpace(dto.ServerUrl)) return null;
+        if (dto is null || string.IsNullOrWhiteSpace(dto.ServerUrl))
+            return null;
         return new ConnectionSettings(new Uri(dto.ServerUrl), dto.Token);
     }
 
@@ -29,13 +31,13 @@ public sealed class FileConfigStore(string? overridePath = null) : IConfigStore
             fs,
             new Dto(settings.ServerUrl.ToString(), settings.Token),
             new JsonSerializerOptions { WriteIndented = true },
-            ct);
+            ct
+        );
 
         try
         {
 #pragma warning disable CA1416 // Validate platform compatibility
-            File.SetUnixFileMode(_path,
-                UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            File.SetUnixFileMode(_path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
 #pragma warning restore CA1416 // Validate platform compatibility
         }
         catch (PlatformNotSupportedException) { }
@@ -43,7 +45,8 @@ public sealed class FileConfigStore(string? overridePath = null) : IConfigStore
 
     public Task ClearAsync(CancellationToken ct = default)
     {
-        if (File.Exists(_path)) File.Delete(_path);
+        if (File.Exists(_path))
+            File.Delete(_path);
         return Task.CompletedTask;
     }
 
@@ -55,7 +58,9 @@ public sealed class FileConfigStore(string? overridePath = null) : IConfigStore
         var baseDir = !string.IsNullOrWhiteSpace(xdg)
             ? xdg
             : System.IO.Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config");
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                ".config"
+            );
         return System.IO.Path.Combine(baseDir, "blukube", "config.json");
     }
 

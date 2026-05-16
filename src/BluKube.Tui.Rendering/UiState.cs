@@ -4,7 +4,7 @@ internal enum ViewMode
 {
     Search,
     Results,
-    Player
+    Player,
 }
 
 internal sealed class UiState

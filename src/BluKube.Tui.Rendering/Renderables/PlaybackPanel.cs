@@ -12,7 +12,8 @@ internal sealed class PlaybackPanel(
     string? title,
     string? channel,
     string? error,
-    bool compact = false) : IRenderable
+    bool compact = false
+) : IRenderable
 {
     private IRenderable Build()
     {
@@ -22,9 +23,14 @@ internal sealed class PlaybackPanel(
         if (compact)
             return BuildCompact(playback);
 
-        var percent = playback.Duration.TotalSeconds > 0
-            ? Math.Clamp(playback.Position.TotalSeconds / playback.Duration.TotalSeconds, 0d, 1d)
-            : 0d;
+        var percent =
+            playback.Duration.TotalSeconds > 0
+                ? Math.Clamp(
+                    playback.Position.TotalSeconds / playback.Duration.TotalSeconds,
+                    0d,
+                    1d
+                )
+                : 0d;
 
         var progressBar = new BreakdownChart()
             .Width(60)
@@ -32,15 +38,31 @@ internal sealed class PlaybackPanel(
             .AddItem("done", percent * 100, Color.Purple)
             .AddItem("left", (1 - percent) * 100, Color.Grey);
 
-        var meta = new Grid().AddColumn().AddColumn()
-            .AddRow(new Markup("[grey]title[/]"), new SanitizedText(title, fallback: playback.VideoId))
+        var meta = new Grid()
+            .AddColumn()
+            .AddColumn()
+            .AddRow(
+                new Markup("[grey]title[/]"),
+                new SanitizedText(title, fallback: playback.VideoId)
+            )
             .AddRow(new Markup("[grey]channel[/]"), new SanitizedText(channel))
             .AddRow(new Markup("[grey]video[/]"), new Markup(Markup.Escape(playback.VideoId)))
-            .AddRow(new Markup("[grey]state[/]"), new Markup(playback.IsPlaying ? "[green]playing[/]" : "[yellow]paused[/]"))
-            .AddRow(new Markup("[grey]time[/]"), new TimeRangeLabel(playback.Position, playback.Duration));
+            .AddRow(
+                new Markup("[grey]state[/]"),
+                new Markup(playback.IsPlaying ? "[green]playing[/]" : "[yellow]paused[/]")
+            )
+            .AddRow(
+                new Markup("[grey]time[/]"),
+                new TimeRangeLabel(playback.Position, playback.Duration)
+            );
 
-        var volumeRow = new Grid().AddColumn().AddColumn()
-            .AddRow(new Markup("[grey]volume[/]"), new Markup($"{(int)Math.Round(playback.Volume * 100)}%"));
+        var volumeRow = new Grid()
+            .AddColumn()
+            .AddColumn()
+            .AddRow(
+                new Markup("[grey]volume[/]"),
+                new Markup($"{(int)Math.Round(playback.Volume * 100)}%")
+            );
 
         var stack = new Grid().AddColumn();
         stack.AddRow(meta);
@@ -57,13 +79,27 @@ internal sealed class PlaybackPanel(
 
     private IRenderable BuildCompact(PlaybackState playback)
     {
-        var stack = new Grid().AddColumn().AddColumn()
-            .AddRow(new Markup("[grey]state[/]"), new Markup(playback.IsPlaying ? "[green]playing[/]" : "[yellow]paused[/]"))
-            .AddRow(new Markup("[grey]time[/]"), new TimeRangeLabel(playback.Position, playback.Duration))
-            .AddRow(new Markup("[grey]volume[/]"), new Markup($"{(int)Math.Round(playback.Volume * 100)}%"));
+        var stack = new Grid()
+            .AddColumn()
+            .AddColumn()
+            .AddRow(
+                new Markup("[grey]state[/]"),
+                new Markup(playback.IsPlaying ? "[green]playing[/]" : "[yellow]paused[/]")
+            )
+            .AddRow(
+                new Markup("[grey]time[/]"),
+                new TimeRangeLabel(playback.Position, playback.Duration)
+            )
+            .AddRow(
+                new Markup("[grey]volume[/]"),
+                new Markup($"{(int)Math.Round(playback.Volume * 100)}%")
+            );
 
         if (!string.IsNullOrWhiteSpace(error))
-            stack.AddRow(new Markup("[grey]error[/]"), new Markup($"[red]{Markup.Escape(error)}[/]"));
+            stack.AddRow(
+                new Markup("[grey]error[/]"),
+                new Markup($"[red]{Markup.Escape(error)}[/]")
+            );
 
         return new Panel(stack).Header("[bold]playback[/]");
     }

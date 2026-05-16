@@ -20,9 +20,14 @@ public sealed class BraveMediaPlayerIntegrationTests
     [DockerOnlyFact]
     public async Task PlayAndPause_DrivesPlayerThroughLifecycle()
     {
-        await using var display = await new XvfbDisplayFactory().CreateAsync(CancellationToken.None);
-        await using var browser = await new BraveYouTubeBrowserLauncher()
-            .LaunchAsync(display, pulseSink: null, CancellationToken.None);
+        await using var display = await new XvfbDisplayFactory().CreateAsync(
+            CancellationToken.None
+        );
+        await using var browser = await new BraveYouTubeBrowserLauncher().LaunchAsync(
+            display,
+            pulseSink: null,
+            CancellationToken.None
+        );
         await using var player = new BraveMediaPlayer(display, browser);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(90));
@@ -34,6 +39,5 @@ public sealed class BraveMediaPlayerIntegrationTests
 
         var paused = await player.PauseAsync(cts.Token);
         Assert.False(paused.IsPlaying);
-
     }
 }

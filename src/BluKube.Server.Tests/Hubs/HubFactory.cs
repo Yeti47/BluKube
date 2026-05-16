@@ -1,8 +1,8 @@
 using System.Collections.Concurrent;
 using BluKube.Server.Configuration;
 using BluKube.Server.Core.Session;
-using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
@@ -26,7 +26,10 @@ public sealed class HubFactory : WebApplicationFactory<Program>
             services.PostConfigure<BluKube.Server.Configuration.AuthOptions>(opts =>
             {
                 opts.Token = Token;
-                opts.TokenFile = Path.Combine(Path.GetTempPath(), $"blukube-hub-test-{Guid.NewGuid():N}.token");
+                opts.TokenFile = Path.Combine(
+                    Path.GetTempPath(),
+                    $"blukube-hub-test-{Guid.NewGuid():N}.token"
+                );
             });
             services.RemoveAll<ISessionManager>();
             services.AddSingleton<ISessionManager, HubFakeSessionManager>();
@@ -40,13 +43,16 @@ public sealed class HubFactory : WebApplicationFactory<Program>
     public HubConnection CreateHubConnection(string? token = Token)
     {
         return new HubConnectionBuilder()
-            .WithUrl("http://localhost/hubs/session", opts =>
-            {
-                opts.HttpMessageHandlerFactory = _ => Server.CreateHandler();
-                opts.Transports = HttpTransportType.LongPolling;
-                if (token is not null)
-                    opts.AccessTokenProvider = () => Task.FromResult<string?>(token);
-            })
+            .WithUrl(
+                "http://localhost/hubs/session",
+                opts =>
+                {
+                    opts.HttpMessageHandlerFactory = _ => Server.CreateHandler();
+                    opts.Transports = HttpTransportType.LongPolling;
+                    if (token is not null)
+                        opts.AccessTokenProvider = () => Task.FromResult<string?>(token);
+                }
+            )
             .Build();
     }
 }
@@ -65,14 +71,14 @@ internal sealed class HubFakeSessionManager : ISessionManager
         return Task.FromResult<IBrowserSession>(s);
     }
 
-    public Task<IBrowserSession?> GetSessionAsync(Guid sessionId)
-        => Task.FromResult<IBrowserSession?>(
-            _sessions.TryGetValue(sessionId, out var s) ? s : null);
+    public Task<IBrowserSession?> GetSessionAsync(Guid sessionId) =>
+        Task.FromResult<IBrowserSession?>(_sessions.TryGetValue(sessionId, out var s) ? s : null);
 
-    public Task<bool> RemoveSessionAsync(Guid sessionId)
-        => Task.FromResult(_sessions.TryRemove(sessionId, out _));
+    public Task<bool> RemoveSessionAsync(Guid sessionId) =>
+        Task.FromResult(_sessions.TryRemove(sessionId, out _));
 
-    public Task<IReadOnlyList<IBrowserSession>> ListSessionsAsync()
-        => Task.FromResult<IReadOnlyList<IBrowserSession>>(
-            _sessions.Values.Cast<IBrowserSession>().ToList());
+    public Task<IReadOnlyList<IBrowserSession>> ListSessionsAsync() =>
+        Task.FromResult<IReadOnlyList<IBrowserSession>>(
+            _sessions.Values.Cast<IBrowserSession>().ToList()
+        );
 }

@@ -117,14 +117,20 @@ public sealed class XvfbDisplayFactoryTests : IDisposable
     [Fact]
     public void GetNextAvailableDisplayNumber_AllUsed_Throws()
     {
-        for (var i = XvfbDisplayFactory.MinDisplayNumber; i <= XvfbDisplayFactory.MaxDisplayNumber; i++)
+        for (
+            var i = XvfbDisplayFactory.MinDisplayNumber;
+            i <= XvfbDisplayFactory.MaxDisplayNumber;
+            i++
+        )
         {
             File.WriteAllText(Path.Combine(_tempDir, $"X{i}"), string.Empty);
         }
 
         var factory = new XvfbDisplayFactory(_tempDir);
 
-        var ex = Assert.Throws<InvalidOperationException>(() => factory.GetNextAvailableDisplayNumber());
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            factory.GetNextAvailableDisplayNumber()
+        );
         Assert.Contains("Sequence contains no matching element", ex.Message);
     }
 }

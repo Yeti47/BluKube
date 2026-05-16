@@ -11,7 +11,8 @@ namespace BluKube.Web.Xterm;
 public sealed class XtermWriter : TextWriter
 {
     private readonly Channel<string> _channel = Channel.CreateUnbounded<string>(
-        new UnboundedChannelOptions { SingleReader = true, AllowSynchronousContinuations = false });
+        new UnboundedChannelOptions { SingleReader = true, AllowSynchronousContinuations = false }
+    );
 
     public ChannelReader<string> Output => _channel.Reader;
 
@@ -23,14 +24,12 @@ public sealed class XtermWriter : TextWriter
             _channel.Writer.TryWrite(value);
     }
 
-    public override void Write(char value) =>
-        _channel.Writer.TryWrite(value.ToString());
+    public override void Write(char value) => _channel.Writer.TryWrite(value.ToString());
 
     public override void WriteLine(string? value) =>
         _channel.Writer.TryWrite((value ?? string.Empty) + "\r\n");
 
-    public override void WriteLine() =>
-        _channel.Writer.TryWrite("\r\n");
+    public override void WriteLine() => _channel.Writer.TryWrite("\r\n");
 
     public override void Flush() { } // unbuffered — every write goes straight to the channel
 

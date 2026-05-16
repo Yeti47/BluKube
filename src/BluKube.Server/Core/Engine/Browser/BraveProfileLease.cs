@@ -10,7 +10,8 @@ public sealed class BraveProfileLease(string profilePath, ILogger? logger = null
 
     public async ValueTask DisposeAsync()
     {
-        if (_disposed) return;
+        if (_disposed)
+            return;
         _disposed = true;
 
         for (var attempt = 0; attempt < 5; attempt++)
@@ -25,7 +26,11 @@ public sealed class BraveProfileLease(string profilePath, ILogger? logger = null
             }
             catch (Exception ex) when (attempt < 4)
             {
-                logger?.LogDebug(ex, "Failed to delete Brave profile {ProfilePath}; retrying", ProfilePath);
+                logger?.LogDebug(
+                    ex,
+                    "Failed to delete Brave profile {ProfilePath}; retrying",
+                    ProfilePath
+                );
                 await Task.Delay(100);
             }
             catch (Exception ex)

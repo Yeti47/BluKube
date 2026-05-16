@@ -22,4 +22,5 @@ public sealed record PlayerSnapshot(
     TimeSpan Position,
     TimeSpan Duration,
     bool IsPlaying,
-    float Volume);
+    float Volume
+);

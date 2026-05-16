@@ -1,12 +1,16 @@
 using BluKube.Contracts;
+using BluKube.Web.Components.Pages;
 using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
 
 namespace BluKube.Web.Services;
 
 public sealed class NativeClientService(ClientSessionService session, AudioStreamService audio)
+    : IClientViewService
 {
     public event EventHandler? StateChanged;
 
+    public ClientView View => ClientView.Native;
     public Task? StateTask { get; private set; }
     public string Query { get; set; } = string.Empty;
     public bool Busy { get; private set; }
@@ -41,16 +45,49 @@ public sealed class NativeClientService(ClientSessionService session, AudioStrea
 
     public void ClearTasks() => StateTask = null;
 
+    public async Task ActivateAsync(DotNetObjectReference<Home>? homeReference)
+    {
+        try
+        {
+            await StartAsync();
+        }
+        catch (Exception ex)
+        {
+            SetError(ex.Message);
+            NotifyStateChanged();
+        }
+    }
+
+    public async Task DeactivateAsync(bool resetSession = true)
+    {
+        await session.StopAsync(audio.PumpTask, StateTask);
+
+        ClearTasks();
+        audio.Clear();
+
+        if (resetSession)
+            session.ResetCancellation();
+    }
+
+    public void ClearState()
+    {
+        Query = string.Empty;
+        Reset();
+    }
+
     public void SetError(string message)
     {
         Error = message;
         ClearBusy();
     }
 
+    public void PostKey(string key, bool shift, bool ctrl, bool alt) { }
+
     public async Task SearchAsync()
     {
         var connection = session.Connection;
-        if (connection is null || string.IsNullOrWhiteSpace(Query)) return;
+        if (connection is null || string.IsNullOrWhiteSpace(Query))
+            return;
 
         SetBusy("Searching...");
         Error = null;
@@ -75,7 +112,8 @@ public sealed class NativeClientService(ClientSessionService session, AudioStrea
     public async Task PlayAsync(MediaItem item)
     {
         var connection = session.Connection;
-        if (connection is null) return;
+        if (connection is null)
+            return;
 
         await audio.ResumeAsync();
         SetBusy("Loading track...");
@@ -102,7 +140,8 @@ public sealed class NativeClientService(ClientSessionService session, AudioStrea
     public async Task TogglePlaybackAsync()
     {
         var connection = session.Connection;
-        if (connection is null || State is not PlaybackState playback) return;
+        if (connection is null || State is not PlaybackState playback)
+            return;
 
         await audio.ResumeAsync();
         SetBusy(playback.IsPlaying ? "Pausing..." : "Resuming...");
@@ -128,11 +167,14 @@ public sealed class NativeClientService(ClientSessionService session, AudioStrea
     public async Task SeekAsync(TimeSpan delta)
     {
         var connection = session.Connection;
-        if (connection is null || State is not PlaybackState playback) return;
+        if (connection is null || State is not PlaybackState playback)
+            return;
 
         var next = playback.Position + delta;
-        if (next < TimeSpan.Zero) next = TimeSpan.Zero;
-        if (playback.Duration > TimeSpan.Zero && next > playback.Duration) next = playback.Duration;
+        if (next < TimeSpan.Zero)
+            next = TimeSpan.Zero;
+        if (playback.Duration > TimeSpan.Zero && next > playback.Duration)
+            next = playback.Duration;
 
         SetBusy("Seeking...");
         NotifyStateChanged();
@@ -154,12 +196,16 @@ public sealed class NativeClientService(ClientSessionService session, AudioStrea
     public async Task SetVolumeAsync(ChangeEventArgs args)
     {
         var connection = session.Connection;
-        if (connection is null) return;
-        if (!int.TryParse(args.Value?.ToString(), out var percent)) return;
+        if (connection is null)
+            return;
+        if (!int.TryParse(args.Value?.ToString(), out var percent))
+            return;
 
         try
         {
-            ApplyState(await connection.SetVolumeAsync(Math.Clamp(percent, 0, 100) / 100f, session.Token));
+            ApplyState(
+                await connection.SetVolumeAsync(Math.Clamp(percent, 0, 100) / 100f, session.Token)
+            );
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -170,7 +216,8 @@ public sealed class NativeClientService(ClientSessionService session, AudioStrea
     public async Task StopAsync()
     {
         var connection = session.Connection;
-        if (connection is null) return;
+        if (connection is null)
+            return;
 
         SetBusy("Stopping...");
         NotifyStateChanged();
@@ -194,7 +241,8 @@ public sealed class NativeClientService(ClientSessionService session, AudioStrea
     private async Task PumpStatesAsync()
     {
         var connection = session.Connection;
-        if (connection is null) return;
+        if (connection is null)
+            return;
 
         try
         {
@@ -259,7 +307,8 @@ public sealed class NativeClientService(ClientSessionService session, AudioStrea
             }
 
             var segment = uri.Segments.LastOrDefault();
-            if (!string.IsNullOrEmpty(segment)) return segment.TrimEnd('/');
+            if (!string.IsNullOrEmpty(segment))
+                return segment.TrimEnd('/');
         }
 
         return url;

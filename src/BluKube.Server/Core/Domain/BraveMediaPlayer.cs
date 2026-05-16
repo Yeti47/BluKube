@@ -13,7 +13,9 @@ namespace BluKube.Server.Core.Domain;
 /// Owns a single isolated engine (Display + Browser) and one watch page
 /// at a time. Polls the watch page for position ticks while playing.
 /// </summary>
-public sealed class BraveMediaPlayer(IDisplay display, IYouTubeBrowser browser) : IMediaPlayer, IMediaSearch
+public sealed class BraveMediaPlayer(IDisplay display, IYouTubeBrowser browser)
+    : IMediaPlayer,
+        IMediaSearch
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(500);
 
@@ -28,7 +30,11 @@ public sealed class BraveMediaPlayer(IDisplay display, IYouTubeBrowser browser) 
     private int _userPaused;
     private int _disposed;
 
-    public async Task<IReadOnlyList<MediaItem>> SearchAsync(string query, int limit, CancellationToken ct)
+    public async Task<IReadOnlyList<MediaItem>> SearchAsync(
+        string query,
+        int limit,
+        CancellationToken ct
+    )
     {
         await _gate.WaitAsync(ct);
         try
@@ -79,8 +85,13 @@ public sealed class BraveMediaPlayer(IDisplay display, IYouTubeBrowser browser) 
             await StopPollingAsync();
             if (_currentWatch is { } watch)
             {
-                try { await watch.PauseAsync(ct); }
-                catch { /* best-effort: we're stopping regardless */ }
+                try
+                {
+                    await watch.PauseAsync(ct);
+                }
+                catch
+                { /* best-effort: we're stopping regardless */
+                }
             }
             _currentWatch = null;
             _currentVideoId = null;
@@ -91,40 +102,59 @@ public sealed class BraveMediaPlayer(IDisplay display, IYouTubeBrowser browser) 
         }
     }
 
-    public Task<PlayerSnapshot> PauseAsync(CancellationToken ct)
-        => OnWatch(async (watch, linkedCt) =>
-        {
-            Interlocked.Exchange(ref _userPaused, 1);
-            await StopPollingAsync();
-            return (await watch.PauseAsync(linkedCt)).ToPlayerSnapshot(_currentVideoId ?? string.Empty);
-        }, ct);
+    public Task<PlayerSnapshot> PauseAsync(CancellationToken ct) =>
+        OnWatch(
+            async (watch, linkedCt) =>
+            {
+                Interlocked.Exchange(ref _userPaused, 1);
+                await StopPollingAsync();
+                return (await watch.PauseAsync(linkedCt)).ToPlayerSnapshot(
+                    _currentVideoId ?? string.Empty
+                );
+            },
+            ct
+        );
 
-    public Task<PlayerSnapshot> ResumeAsync(CancellationToken ct)
-        => OnWatch(async (watch, linkedCt) =>
-        {
-            await StopPollingAsync();
-            var snapshot = (await watch.EnsurePlayingAsync(linkedCt)).ToPlayerSnapshot(_currentVideoId ?? string.Empty);
-            Interlocked.Exchange(ref _userPaused, 0);
-            StartPolling();
-            return snapshot;
-        }, ct);
+    public Task<PlayerSnapshot> ResumeAsync(CancellationToken ct) =>
+        OnWatch(
+            async (watch, linkedCt) =>
+            {
+                await StopPollingAsync();
+                var snapshot = (await watch.EnsurePlayingAsync(linkedCt)).ToPlayerSnapshot(
+                    _currentVideoId ?? string.Empty
+                );
+                Interlocked.Exchange(ref _userPaused, 0);
+                StartPolling();
+                return snapshot;
+            },
+            ct
+        );
 
-    public Task<PlayerSnapshot> SeekToAsync(TimeSpan position, CancellationToken ct)
-        => OnWatch(async (watch, linkedCt) =>
-            (await watch.SeekToAsync(position, linkedCt)).ToPlayerSnapshot(_currentVideoId ?? string.Empty), ct);
+    public Task<PlayerSnapshot> SeekToAsync(TimeSpan position, CancellationToken ct) =>
+        OnWatch(
+            async (watch, linkedCt) =>
+                (await watch.SeekToAsync(position, linkedCt)).ToPlayerSnapshot(
+                    _currentVideoId ?? string.Empty
+                ),
+            ct
+        );
 
-    public Task<PlayerSnapshot> SetVolumeAsync(float volume, CancellationToken ct)
-        => OnWatch(async (watch, linkedCt) =>
-            (await watch.SetVolumeAsync(Math.Clamp(volume, 0f, 1f), linkedCt)).ToPlayerSnapshot(_currentVideoId ?? string.Empty), ct);
+    public Task<PlayerSnapshot> SetVolumeAsync(float volume, CancellationToken ct) =>
+        OnWatch(
+            async (watch, linkedCt) =>
+                (await watch.SetVolumeAsync(Math.Clamp(volume, 0f, 1f), linkedCt)).ToPlayerSnapshot(
+                    _currentVideoId ?? string.Empty
+                ),
+            ct
+        );
 
     public async IAsyncEnumerable<PlaybackEvent> Events(
-        [EnumeratorCancellation] CancellationToken ct)
+        [EnumeratorCancellation] CancellationToken ct
+    )
     {
-        var channel = Channel.CreateUnbounded<PlaybackEvent>(new UnboundedChannelOptions
-        {
-            SingleReader = true,
-            SingleWriter = false
-        });
+        var channel = Channel.CreateUnbounded<PlaybackEvent>(
+            new UnboundedChannelOptions { SingleReader = true, SingleWriter = false }
+        );
         var key = Guid.NewGuid();
         _subscribers[key] = channel;
 
@@ -144,7 +174,8 @@ public sealed class BraveMediaPlayer(IDisplay display, IYouTubeBrowser browser) 
 
     private async Task<PlayerSnapshot> OnWatch(
         Func<IWatchPage, CancellationToken, Task<PlayerSnapshot>> action,
-        CancellationToken ct)
+        CancellationToken ct
+    )
     {
         await _gate.WaitAsync(ct);
         try
@@ -164,8 +195,10 @@ public sealed class BraveMediaPlayer(IDisplay display, IYouTubeBrowser browser) 
 
     private void StartPolling()
     {
-        if (Volatile.Read(ref _disposed) == 1) return;
-        if (_pollTask is { IsCompleted: false }) return;
+        if (Volatile.Read(ref _disposed) == 1)
+            return;
+        if (_pollTask is { IsCompleted: false })
+            return;
 
         var cts = CancellationTokenSource.CreateLinkedTokenSource(_disposeCts.Token);
         _pollCts = cts;
@@ -176,11 +209,20 @@ public sealed class BraveMediaPlayer(IDisplay display, IYouTubeBrowser browser) 
     {
         var cts = Interlocked.Exchange(ref _pollCts, null);
         var task = Interlocked.Exchange(ref _pollTask, null);
-        if (cts is null) return;
-        try { cts.Cancel(); } catch { }
+        if (cts is null)
+            return;
+        try
+        {
+            cts.Cancel();
+        }
+        catch { }
         if (task is not null)
         {
-            try { await task.ConfigureAwait(false); } catch { }
+            try
+            {
+                await task.ConfigureAwait(false);
+            }
+            catch { }
         }
         cts.Dispose();
     }
@@ -194,22 +236,28 @@ public sealed class BraveMediaPlayer(IDisplay display, IYouTubeBrowser browser) 
                 await Task.Delay(PollInterval, ct);
 
                 var watch = _currentWatch;
-                if (watch is null) continue;
+                if (watch is null)
+                    continue;
 
                 PlayerSnapshot snapshot;
                 try
                 {
                     var pageSnapshot = await watch.ReadStateAsync(ct);
-                    if (!pageSnapshot.IsPlaying &&
-                        !pageSnapshot.IsEnded &&
-                        pageSnapshot.Duration > TimeSpan.Zero &&
-                        Volatile.Read(ref _userPaused) == 0)
+                    if (
+                        !pageSnapshot.IsPlaying
+                        && !pageSnapshot.IsEnded
+                        && pageSnapshot.Duration > TimeSpan.Zero
+                        && Volatile.Read(ref _userPaused) == 0
+                    )
                     {
                         pageSnapshot = await watch.EnsurePlayingAsync(ct);
                     }
                     snapshot = pageSnapshot.ToPlayerSnapshot(_currentVideoId ?? string.Empty);
                 }
-                catch (OperationCanceledException) { throw; }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
                 catch (Exception ex)
                 {
                     Publish(new PlaybackFailed("polling_failed", ex.Message));
@@ -243,13 +291,18 @@ public sealed class BraveMediaPlayer(IDisplay display, IYouTubeBrowser browser) 
 
     public async ValueTask DisposeAsync()
     {
-        if (Interlocked.Exchange(ref _disposed, 1) == 1) return;
+        if (Interlocked.Exchange(ref _disposed, 1) == 1)
+            return;
 
         await _gate.WaitAsync();
         try
         {
             await StopPollingAsync();
-            try { _disposeCts.Cancel(); } catch { }
+            try
+            {
+                _disposeCts.Cancel();
+            }
+            catch { }
 
             foreach (var sub in _subscribers.Values)
             {
@@ -257,8 +310,16 @@ public sealed class BraveMediaPlayer(IDisplay display, IYouTubeBrowser browser) 
             }
             _subscribers.Clear();
 
-            try { await browser.DisposeAsync(); } catch { }
-            try { await display.DisposeAsync(); } catch { }
+            try
+            {
+                await browser.DisposeAsync();
+            }
+            catch { }
+            try
+            {
+                await display.DisposeAsync();
+            }
+            catch { }
 
             _disposeCts.Dispose();
         }

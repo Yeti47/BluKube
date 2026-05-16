@@ -4,5 +4,9 @@ namespace BluKube.Server.Core.Engine.Browser;
 
 public interface IYouTubeBrowserLauncher
 {
-    Task<IYouTubeBrowser> LaunchAsync(IDisplay display, string? pulseSink, CancellationToken cancellationToken);
+    Task<IYouTubeBrowser> LaunchAsync(
+        IDisplay display,
+        string? pulseSink,
+        CancellationToken cancellationToken
+    );
 }

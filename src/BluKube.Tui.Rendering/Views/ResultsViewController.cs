@@ -9,7 +9,12 @@ internal sealed class ResultsViewController(BluKubeConnection connection) : IVie
 {
     public ViewMode Mode => ViewMode.Results;
 
-    public async Task DispatchAsync(KeyPress key, UiState state, Channel<bool> redraw, CancellationToken ct)
+    public async Task DispatchAsync(
+        KeyPress key,
+        UiState state,
+        Channel<bool> redraw,
+        CancellationToken ct
+    )
     {
         switch (key.Key)
         {
@@ -30,7 +35,10 @@ internal sealed class ResultsViewController(BluKubeConnection connection) : IVie
             case Key.DownArrow:
                 if (state.Results.Count > 0)
                 {
-                    var pageMax = Math.Min(state.Results.Count - 1, (state.Page + 1) * state.PageSize - 1);
+                    var pageMax = Math.Min(
+                        state.Results.Count - 1,
+                        (state.Page + 1) * state.PageSize - 1
+                    );
                     state.SelectedIndex = Math.Min(pageMax, state.SelectedIndex + 1);
                     await redraw.Writer.WriteAsync(true, ct);
                 }

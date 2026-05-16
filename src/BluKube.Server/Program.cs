@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using BluKube.Server.Auth;
 using BluKube.Server.Configuration;
 using BluKube.Server.Core.Engine.Browser;
@@ -6,6 +5,7 @@ using BluKube.Server.Core.Engine.Display;
 using BluKube.Server.Core.Session;
 using BluKube.Server.Endpoints;
 using BluKube.Server.Hubs;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,42 +23,44 @@ else if (!builder.Environment.IsDevelopment())
 }
 
 // --- Options -----------------------------------------------------------------
-builder.Services
-    .AddOptions<SessionLimits>()
+builder
+    .Services.AddOptions<SessionLimits>()
     .Bind(builder.Configuration.GetSection(SessionLimits.SectionName))
     .ValidateDataAnnotations();
 
-builder.Services
-    .AddOptions<AuthOptions>()
+builder
+    .Services.AddOptions<AuthOptions>()
     .Bind(builder.Configuration.GetSection(AuthOptions.SectionName))
     .Configure(opts =>
     {
         var envToken = Environment.GetEnvironmentVariable("BLUKUBE_TOKEN");
-        if (!string.IsNullOrWhiteSpace(envToken)) opts.Token = envToken;
+        if (!string.IsNullOrWhiteSpace(envToken))
+            opts.Token = envToken;
 
         var envFile = Environment.GetEnvironmentVariable("BLUKUBE_TOKEN_FILE");
-        if (!string.IsNullOrWhiteSpace(envFile)) opts.TokenFile = envFile;
+        if (!string.IsNullOrWhiteSpace(envFile))
+            opts.TokenFile = envFile;
     });
 
-builder.Services
-    .AddOptions<CorsOptions>()
+builder
+    .Services.AddOptions<CorsOptions>()
     .Bind(builder.Configuration.GetSection(CorsOptions.SectionName));
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<AuthTokenProvider>();
 
 // --- CORS (opt-in) -----------------------------------------------------------
-var corsOrigins = builder.Configuration
-    .GetSection(CorsOptions.SectionName)
-    .Get<CorsOptions>()?.Origins ?? [];
+var corsOrigins =
+    builder.Configuration.GetSection(CorsOptions.SectionName).Get<CorsOptions>()?.Origins ?? [];
 
 if (corsOrigins.Length > 0)
 {
-    builder.Services.AddCors(o => o.AddPolicy(CorsOptions.PolicyName, p => p
-        .WithOrigins(corsOrigins)
-        .AllowAnyHeader()
-        .AllowAnyMethod()
-        .AllowCredentials()));
+    builder.Services.AddCors(o =>
+        o.AddPolicy(
+            CorsOptions.PolicyName,
+            p => p.WithOrigins(corsOrigins).AllowAnyHeader().AllowAnyMethod().AllowCredentials()
+        )
+    );
 }
 
 // --- Framework ---------------------------------------------------------------
@@ -70,8 +72,10 @@ builder.Services.AddSignalR();
 builder.Services.AddSingleton<IDisplayFactory, XvfbDisplayFactory>();
 builder.Services.AddSingleton<IBraveProfileProvisioner, BraveProfileProvisioner>();
 builder.Services.AddSingleton<IYouTubeBrowserLauncher, BraveYouTubeBrowserLauncher>();
-builder.Services.AddSingleton<BluKube.Server.Core.Engine.Audio.IAudioOutputDeviceFactory,
-    BluKube.Server.Core.Engine.Audio.PulseAudioOutputDeviceFactory>();
+builder.Services.AddSingleton<
+    BluKube.Server.Core.Engine.Audio.IAudioOutputDeviceFactory,
+    BluKube.Server.Core.Engine.Audio.PulseAudioOutputDeviceFactory
+>();
 
 // --- Session registry — singleton; owns the lifetime of all sessions. -------
 builder.Services.AddSingleton<ISessionManager, SessionManager>();
@@ -90,11 +94,10 @@ app.UseMiddleware<BearerTokenMiddleware>();
 
 app.MapOpenApi();
 app.MapHealthChecks("/health", new HealthCheckOptions { AllowCachingResponses = false });
-app.MapHealthChecks("/alive", new HealthCheckOptions
-{
-    Predicate = _ => false,
-    AllowCachingResponses = false
-});
+app.MapHealthChecks(
+    "/alive",
+    new HealthCheckOptions { Predicate = _ => false, AllowCachingResponses = false }
+);
 
 app.MapGet("/", () => "BluKube Server — OK");
 app.MapHub<SessionHub>("/hubs/session");

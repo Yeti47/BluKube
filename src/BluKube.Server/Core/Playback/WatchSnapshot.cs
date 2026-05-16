@@ -9,4 +9,5 @@ public sealed record WatchSnapshot(
     TimeSpan Duration,
     bool IsPlaying,
     bool IsEnded,
-    float Volume);
+    float Volume
+);

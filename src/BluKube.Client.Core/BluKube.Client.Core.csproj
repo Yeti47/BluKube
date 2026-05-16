@@ -1,5 +1,4 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <LangVersion>preview</LangVersion>
@@ -21,5 +20,4 @@
   <ItemGroup>
     <Using Include="BluKube.Contracts" />
   </ItemGroup>
-
 </Project>

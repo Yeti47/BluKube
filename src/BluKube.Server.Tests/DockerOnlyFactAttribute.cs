@@ -29,8 +29,10 @@ public sealed class DockerOnlyFactAttribute : FactAttribute
 
         try
         {
-            if (File.Exists("/proc/1/cgroup") &&
-                File.ReadAllText("/proc/1/cgroup").Contains("docker"))
+            if (
+                File.Exists("/proc/1/cgroup")
+                && File.ReadAllText("/proc/1/cgroup").Contains("docker")
+            )
             {
                 return true;
             }
@@ -43,4 +45,3 @@ public sealed class DockerOnlyFactAttribute : FactAttribute
         return false;
     }
 }
-

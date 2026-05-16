@@ -24,8 +24,8 @@ public sealed class BrowserSessionTests
         {
             NextResults = new[]
             {
-                new MediaItem("Hello", "Adele", "https://x/y", TimeSpan.FromMinutes(4))
-            }
+                new MediaItem("Hello", "Adele", "https://x/y", TimeSpan.FromMinutes(4)),
+            },
         };
         var session = new BrowserSession(fake, fake);
 
@@ -44,7 +44,12 @@ public sealed class BrowserSessionTests
         var fake = new FakeMediaPlayer
         {
             NextSnapshot = new PlayerSnapshot(
-                "abc", TimeSpan.FromSeconds(1), TimeSpan.FromMinutes(3), true, 0.8f)
+                "abc",
+                TimeSpan.FromSeconds(1),
+                TimeSpan.FromMinutes(3),
+                true,
+                0.8f
+            ),
         };
         var session = new BrowserSession(fake, fake);
 
@@ -104,8 +109,17 @@ public sealed class BrowserSessionTests
         // Skip the initial idle baseline.
         Assert.True(await enumerator.MoveNextAsync());
 
-        fake.EmitEvent(new PositionChanged(
-            new PlayerSnapshot("vid", TimeSpan.FromSeconds(7), TimeSpan.FromMinutes(2), true, 1f)));
+        fake.EmitEvent(
+            new PositionChanged(
+                new PlayerSnapshot(
+                    "vid",
+                    TimeSpan.FromSeconds(7),
+                    TimeSpan.FromMinutes(2),
+                    true,
+                    1f
+                )
+            )
+        );
 
         Assert.True(await enumerator.MoveNextAsync());
         var pb = Assert.IsType<PlaybackState>(enumerator.Current);

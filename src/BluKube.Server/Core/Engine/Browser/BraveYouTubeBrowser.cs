@@ -9,7 +9,8 @@ public sealed class BraveYouTubeBrowser(
     IPage page,
     IBrowserContext context,
     IPlaywright playwright,
-    BraveProfileLease profile) : IYouTubeBrowser
+    BraveProfileLease profile
+) : IYouTubeBrowser
 {
     private readonly IPage _page = page;
     private bool _disposed;
@@ -30,10 +31,15 @@ public sealed class BraveYouTubeBrowser(
 
     public async ValueTask DisposeAsync()
     {
-        if (_disposed) return;
+        if (_disposed)
+            return;
         _disposed = true;
 
-        try { await context.CloseAsync(); } catch { }
+        try
+        {
+            await context.CloseAsync();
+        }
+        catch { }
         playwright.Dispose();
         await profile.DisposeAsync();
     }

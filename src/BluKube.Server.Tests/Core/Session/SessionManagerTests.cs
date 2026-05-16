@@ -43,25 +43,29 @@ public sealed class SessionManagerTests
     private static SessionManager CreateManager(
         IDisplayFactory displayFactory,
         IYouTubeBrowserLauncher browserLauncher,
-        IAudioOutputDeviceFactory audioFactory)
-        => new(
+        IAudioOutputDeviceFactory audioFactory
+    ) =>
+        new(
             displayFactory,
             browserLauncher,
             audioFactory,
-            Options.Create(new SessionLimits
-            {
-                MaxSessions = 4,
-                IdleTimeout = TimeSpan.FromHours(1),
-                SweepInterval = TimeSpan.FromHours(1)
-            }),
-            NullLogger<SessionManager>.Instance);
+            Options.Create(
+                new SessionLimits
+                {
+                    MaxSessions = 4,
+                    IdleTimeout = TimeSpan.FromHours(1),
+                    SweepInterval = TimeSpan.FromHours(1),
+                }
+            ),
+            NullLogger<SessionManager>.Instance
+        );
 
     private sealed class FakeDisplayFactory : IDisplayFactory
     {
         public FakeDisplay Display { get; } = new();
 
-        public Task<IDisplay> CreateAsync(CancellationToken cancellationToken)
-            => Task.FromResult<IDisplay>(Display);
+        public Task<IDisplay> CreateAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IDisplay>(Display);
     }
 
     private sealed class FakeDisplay : IDisplay
@@ -98,7 +102,8 @@ public sealed class SessionManagerTests
         public bool Disposed { get; private set; }
 
         public async IAsyncEnumerable<byte[]> StreamOpusAsync(
-            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct
+        )
         {
             await Task.CompletedTask;
             yield break;
@@ -116,7 +121,11 @@ public sealed class SessionManagerTests
         public bool WasCalled { get; private set; }
         public string? PulseSink { get; private set; }
 
-        public Task<IYouTubeBrowser> LaunchAsync(IDisplay display, string? pulseSink, CancellationToken cancellationToken)
+        public Task<IYouTubeBrowser> LaunchAsync(
+            IDisplay display,
+            string? pulseSink,
+            CancellationToken cancellationToken
+        )
         {
             WasCalled = true;
             PulseSink = pulseSink;

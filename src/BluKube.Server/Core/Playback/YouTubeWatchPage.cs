@@ -1,7 +1,7 @@
 using System.Globalization;
-using Microsoft.Playwright;
-using BluKube.Server.Core.Engine.Browser;
 using System.Text.Json;
+using BluKube.Server.Core.Engine.Browser;
+using Microsoft.Playwright;
 
 namespace BluKube.Server.Core.Playback;
 
@@ -10,9 +10,9 @@ internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
     private const int PlaybackRetryDelayMs = 500;
     private const int PlaybackCheckDelayMs = 1200;
     private const string ActiveVideoExpression =
-                "document.querySelector(\"video.video-stream:not([aria-hidden='true'])\") ?? " +
-                "document.querySelector(\"video.video-stream\") ?? " +
-                "document.querySelector(\"video\")";
+        "document.querySelector(\"video.video-stream:not([aria-hidden='true'])\") ?? "
+        + "document.querySelector(\"video.video-stream\") ?? "
+        + "document.querySelector(\"video\")";
 
     private readonly IPage _page = page;
 
@@ -21,11 +21,14 @@ internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
         await _page.AddInitScriptAsync(
             """
                         try { localStorage.setItem('yt-player-autonav-state', 'false'); } catch { }
-            """);
+            """
+        );
 
         var url = $"https://www.youtube.com/watch?v={Uri.EscapeDataString(videoId)}&autoplay=0";
-        await _page.GotoAsync(url,
-            new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = 45000 });
+        await _page.GotoAsync(
+            url,
+            new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = 45000 }
+        );
 
         await DismissConsentAsync(_page);
         await DisableAutoplayAsync(_page);
@@ -37,10 +40,11 @@ internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
               return !!video;
             }
             """,
-            new PageWaitForFunctionOptions { Timeout = 30000 });
+            new PageWaitForFunctionOptions { Timeout = 30000 }
+        );
 
-            await DisableAutoplayAsync(_page);
-            await EnsureOriginalAudioAsync(_page);
+        await DisableAutoplayAsync(_page);
+        await EnsureOriginalAudioAsync(_page);
     }
 
     public async Task<WatchSnapshot> ReadStateAsync(CancellationToken ct)
@@ -71,20 +75,28 @@ internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
             if (await TryPlayDomAsync(page))
             {
                 var (progressed, after) = await WaitForProgressAsync(page, before);
-                if (progressed) return after.ToSnapshot();
+                if (progressed)
+                    return after.ToSnapshot();
             }
 
             switch (attempt % 3)
             {
-                case 0: await TryClickPlayButtonAsync(page); break;
-                case 1: await page.Keyboard.PressAsync("k"); break;
-                case 2: await TryClickVideoSurfaceAsync(page); break;
+                case 0:
+                    await TryClickPlayButtonAsync(page);
+                    break;
+                case 1:
+                    await page.Keyboard.PressAsync("k");
+                    break;
+                case 2:
+                    await TryClickVideoSurfaceAsync(page);
+                    break;
             }
 
             if (await TryPlayDomAsync(page))
             {
                 var (progressed, after) = await WaitForProgressAsync(page, before);
-                if (progressed) return after.ToSnapshot();
+                if (progressed)
+                    return after.ToSnapshot();
             }
 
             await Task.Delay(PlaybackRetryDelayMs, ct);
@@ -99,8 +111,8 @@ internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
         return (await ReadRawAsync()).ToSnapshot();
     }
 
-    public async Task<WatchSnapshot> ResumeAsync(CancellationToken ct)
-        => await EnsurePlayingAsync(ct);
+    public async Task<WatchSnapshot> ResumeAsync(CancellationToken ct) =>
+        await EnsurePlayingAsync(ct);
 
     public async Task<WatchSnapshot> SeekToAsync(TimeSpan position, CancellationToken ct)
     {
@@ -147,7 +159,8 @@ internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
                 location: location.href
               };
             }
-            """);
+            """
+        );
 
     private static Task<JsonElement?> EvaluateVideoAsync(IPage page, string body) =>
         page.EvaluateAsync(
@@ -157,7 +170,8 @@ internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
               if (!video) return;
               {{body}}
             }
-            """);
+            """
+        );
 
     private static async Task DismissConsentAsync(IPage page)
     {
@@ -175,7 +189,7 @@ internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
                 "tp-yt-paper-button:has-text('Alle akzeptieren')",
                 "button:has-text('Accept all')",
                 "button:has-text('Alle akzeptieren')",
-                "button:has-text('I agree')"
+                "button:has-text('I agree')",
             };
 
             foreach (var selector in candidates)
@@ -209,7 +223,8 @@ internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
                   document.documentElement.style.overflow = '';
                   document.body.style.overflow = '';
                 }
-                """);
+                """
+            );
         }
         catch { }
     }
@@ -227,7 +242,8 @@ internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
                   try { await video.play(); } catch { }
                   return !video.paused;
                 }
-                """);
+                """
+            );
         }
         catch (PlaywrightException)
         {
@@ -235,117 +251,126 @@ internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
         }
     }
 
-        private static async Task DisableAutoplayAsync(IPage page)
+    private static async Task DisableAutoplayAsync(IPage page)
+    {
+        try
         {
-                try
-                {
-                        await page.EvaluateAsync(
-                                """
-                                () => {
-                                    try { localStorage.setItem('yt-player-autonav-state', 'false'); } catch { }
+            await page.EvaluateAsync(
+                """
+                () => {
+                    try { localStorage.setItem('yt-player-autonav-state', 'false'); } catch { }
 
-                                    const player = document.getElementById('movie_player');
-                                    try { player?.setAutonavState?.(false); } catch { }
+                    const player = document.getElementById('movie_player');
+                    try { player?.setAutonavState?.(false); } catch { }
 
-                                    const toggle = document.querySelector('.ytp-autonav-toggle-button');
-                                    if (toggle?.getAttribute('aria-checked') === 'true') {
-                                        toggle.click();
-                                    }
-                                }
-                                """);
+                    const toggle = document.querySelector('.ytp-autonav-toggle-button');
+                    if (toggle?.getAttribute('aria-checked') === 'true') {
+                        toggle.click();
+                    }
                 }
-                catch { }
+                """
+            );
         }
+        catch { }
+    }
 
-        private static async Task EnsureOriginalAudioAsync(IPage page)
+    private static async Task EnsureOriginalAudioAsync(IPage page)
+    {
+        try
         {
-                try
-                {
-                        var result = await page.EvaluateAsync<AudioTrackSelectionResult>(
-                                """
-                                () => {
-                                    const player = document.getElementById('movie_player');
-                                    if (!player?.getAudioTrack || !player?.setAudioTrack) {
-                                        return { attempted: false, switched: false };
-                                    }
+            var result = await page.EvaluateAsync<AudioTrackSelectionResult>(
+                """
+                () => {
+                    const player = document.getElementById('movie_player');
+                    if (!player?.getAudioTrack || !player?.setAudioTrack) {
+                        return { attempted: false, switched: false };
+                    }
 
-                                    const describe = track => ({
-                                        id: track?.id ?? track?.PD?.id ?? null,
-                                        isDefault: !!(track?.isDefault ?? track?.PD?.isDefault),
-                                        isAutoDubbed: !!(track?.isAutoDubbed ?? track?.PD?.isAutoDubbed),
-                                        name: String(track?.name ?? track?.PD?.name ?? '')
-                                    });
+                    const describe = track => ({
+                        id: track?.id ?? track?.PD?.id ?? null,
+                        isDefault: !!(track?.isDefault ?? track?.PD?.isDefault),
+                        isAutoDubbed: !!(track?.isAutoDubbed ?? track?.PD?.isAutoDubbed),
+                        name: String(track?.name ?? track?.PD?.name ?? '')
+                    });
 
-                                    const isOriginalTrack = track => {
-                                        const id = String(track?.id ?? '').toLowerCase();
-                                        const name = String(track?.name ?? '').toLowerCase();
-                                        return id.includes('original') || name.includes('original');
-                                    };
+                    const isOriginalTrack = track => {
+                        const id = String(track?.id ?? '').toLowerCase();
+                        const name = String(track?.name ?? '').toLowerCase();
+                        return id.includes('original') || name.includes('original');
+                    };
 
-                                    const current = describe(player.getAudioTrack());
-                                    const tracks = (player.getAvailableAudioTracks?.() ?? []).map(track => ({ raw: track, info: describe(track) }));
+                    const current = describe(player.getAudioTrack());
+                    const tracks = (player.getAvailableAudioTracks?.() ?? []).map(track => ({ raw: track, info: describe(track) }));
 
-                                    const preferred = tracks.find(track => isOriginalTrack(track.info))
-                                        ?? tracks.find(track => track.info.isDefault && !track.info.isAutoDubbed)
-                                        ?? tracks.find(track => !track.info.isAutoDubbed)
-                                        ?? null;
+                    const preferred = tracks.find(track => isOriginalTrack(track.info))
+                        ?? tracks.find(track => track.info.isDefault && !track.info.isAutoDubbed)
+                        ?? tracks.find(track => !track.info.isAutoDubbed)
+                        ?? null;
 
-                                    if (!preferred) {
-                                        return {
-                                            attempted: tracks.length > 0 || !!current.id,
-                                            switched: false,
-                                            current,
-                                            availableTracks: tracks.map(track => track.info)
-                                        };
-                                    }
+                    if (!preferred) {
+                        return {
+                            attempted: tracks.length > 0 || !!current.id,
+                            switched: false,
+                            current,
+                            availableTracks: tracks.map(track => track.info)
+                        };
+                    }
 
-                                    const shouldSwitch = current.id !== preferred.info.id || current.isAutoDubbed;
-                                    if (!shouldSwitch) {
-                                        return {
-                                            attempted: true,
-                                            switched: false,
-                                            current,
-                                            selected: preferred.info,
-                                            availableTracks: tracks.map(track => track.info)
-                                        };
-                                    }
+                    const shouldSwitch = current.id !== preferred.info.id || current.isAutoDubbed;
+                    if (!shouldSwitch) {
+                        return {
+                            attempted: true,
+                            switched: false,
+                            current,
+                            selected: preferred.info,
+                            availableTracks: tracks.map(track => track.info)
+                        };
+                    }
 
-                                    try {
-                                        player.setAudioTrack(preferred.raw);
-                                    } catch {
-                                        if (preferred.info.id) {
-                                            try { player.setAudioTrack(preferred.info.id); } catch { }
-                                        }
-                                    }
-
-                                    const after = describe(player.getAudioTrack());
-                                    return {
-                                        attempted: true,
-                                        switched: after.id === preferred.info.id && !after.isAutoDubbed,
-                                        current,
-                                        selected: preferred.info,
-                                        after,
-                                        availableTracks: tracks.map(track => track.info)
-                                    };
-                                }
-                                """);
-
-                        if (result.Attempted && result.Switched)
-                        {
-                                await page.WaitForTimeoutAsync(250);
+                    try {
+                        player.setAudioTrack(preferred.raw);
+                    } catch {
+                        if (preferred.info.id) {
+                            try { player.setAudioTrack(preferred.info.id); } catch { }
                         }
-                }
-                catch { }
-        }
+                    }
 
-    private async Task<(bool Progressed, RawState After)> WaitForProgressAsync(IPage page, RawState before)
+                    const after = describe(player.getAudioTrack());
+                    return {
+                        attempted: true,
+                        switched: after.id === preferred.info.id && !after.isAutoDubbed,
+                        current,
+                        selected: preferred.info,
+                        after,
+                        availableTracks: tracks.map(track => track.info)
+                    };
+                }
+                """
+            );
+
+            if (result.Attempted && result.Switched)
+            {
+                await page.WaitForTimeoutAsync(250);
+            }
+        }
+        catch { }
+    }
+
+    private async Task<(bool Progressed, RawState After)> WaitForProgressAsync(
+        IPage page,
+        RawState before
+    )
     {
         await page.WaitForTimeoutAsync(PlaybackCheckDelayMs);
         var after = await ReadRawAsync();
 
-        var progressed = !after.Paused && !after.Ended &&
-            (after.CurrentTime > before.CurrentTime + 0.15 ||
-             (after.CurrentTime > 0.15 && after.ReadyState >= 3));
+        var progressed =
+            !after.Paused
+            && !after.Ended
+            && (
+                after.CurrentTime > before.CurrentTime + 0.15
+                || (after.CurrentTime > 0.15 && after.ReadyState >= 3)
+            );
         return (progressed, after);
     }
 
@@ -374,7 +399,8 @@ internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
                   const rect = video.getBoundingClientRect();
                   return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
                 }
-                """);
+                """
+            );
 
             if (center is not null)
             {
@@ -399,13 +425,14 @@ internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
         public bool HasSkip { get; init; }
         public string? Location { get; init; }
 
-        public WatchSnapshot ToSnapshot()
-            => new(
+        public WatchSnapshot ToSnapshot() =>
+            new(
                 Position: TimeSpan.FromSeconds(Math.Max(0, CurrentTime)),
                 Duration: TimeSpan.FromSeconds(Math.Max(0, Duration)),
                 IsPlaying: !Paused && !Ended,
                 IsEnded: Ended,
-                Volume: Muted ? 0f : (float)Math.Clamp(Volume, 0d, 1d));
+                Volume: Muted ? 0f : (float)Math.Clamp(Volume, 0d, 1d)
+            );
     }
 
     private sealed record AudioTrackInfo
@@ -423,7 +450,8 @@ internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
         public AudioTrackInfo? Current { get; init; }
         public AudioTrackInfo? Selected { get; init; }
         public AudioTrackInfo? After { get; init; }
-        public IReadOnlyList<AudioTrackInfo> AvailableTracks { get; init; } = Array.Empty<AudioTrackInfo>();
+        public IReadOnlyList<AudioTrackInfo> AvailableTracks { get; init; } =
+            Array.Empty<AudioTrackInfo>();
     }
 
     private sealed record VideoCenter(double X, double Y);

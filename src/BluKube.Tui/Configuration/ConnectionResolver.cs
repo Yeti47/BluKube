@@ -14,7 +14,8 @@ public sealed class ConnectionResolver(IConfigStore store, IAnsiConsole console)
         string? overrideUrl,
         string? overrideToken,
         bool forcePrompt,
-        CancellationToken ct)
+        CancellationToken ct
+    )
     {
         var existing = await store.LoadAsync(ct);
 
@@ -23,8 +24,11 @@ public sealed class ConnectionResolver(IConfigStore store, IAnsiConsole console)
 
         if (forcePrompt || string.IsNullOrWhiteSpace(url))
         {
-            url = console.Prompt(new TextPrompt<string>("[grey]Server URL:[/]")
-                .DefaultValue(url ?? "http://127.0.0.1:8765"));
+            url = console.Prompt(
+                new TextPrompt<string>("[grey]Server URL:[/]").DefaultValue(
+                    url ?? "http://127.0.0.1:8765"
+                )
+            );
         }
 
         if (forcePrompt || string.IsNullOrWhiteSpace(token))

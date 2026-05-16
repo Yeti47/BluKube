@@ -15,12 +15,7 @@ public sealed class BearerTokenMiddleware(RequestDelegate next, AuthTokenProvide
 {
     private readonly byte[] _expected = Encoding.UTF8.GetBytes(tokens.Token);
 
-    private static readonly string[] PublicPathPrefixes =
-    [
-        "/health",
-        "/alive",
-        "/openapi",
-    ];
+    private static readonly string[] PublicPathPrefixes = ["/health", "/alive", "/openapi"];
 
     public async Task InvokeAsync(HttpContext context)
     {
@@ -57,8 +52,10 @@ public sealed class BearerTokenMiddleware(RequestDelegate next, AuthTokenProvide
     private static bool TryGetToken(HttpContext context, out byte[] token)
     {
         var header = context.Request.Headers.Authorization.ToString();
-        if (!string.IsNullOrEmpty(header) &&
-            header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        if (
+            !string.IsNullOrEmpty(header)
+            && header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+        )
         {
             token = Encoding.UTF8.GetBytes(header.AsSpan(7).Trim().ToString());
             return token.Length > 0;
@@ -78,6 +75,6 @@ public sealed class BearerTokenMiddleware(RequestDelegate next, AuthTokenProvide
         return false;
     }
 
-    private static bool FixedTimeEquals(byte[] a, byte[] b)
-        => CryptographicOperations.FixedTimeEquals(a, b);
+    private static bool FixedTimeEquals(byte[] a, byte[] b) =>
+        CryptographicOperations.FixedTimeEquals(a, b);
 }

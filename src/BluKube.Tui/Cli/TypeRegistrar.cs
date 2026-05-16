@@ -9,14 +9,14 @@ internal sealed class TypeRegistrar(IServiceCollection services) : ITypeRegistra
 
     public ITypeResolver Build() => new TypeResolver(_services.BuildServiceProvider());
 
-    public void Register(Type service, Type implementation)
-        => _services.AddSingleton(service, implementation);
+    public void Register(Type service, Type implementation) =>
+        _services.AddSingleton(service, implementation);
 
-    public void RegisterInstance(Type service, object implementation)
-        => _services.AddSingleton(service, implementation);
+    public void RegisterInstance(Type service, object implementation) =>
+        _services.AddSingleton(service, implementation);
 
-    public void RegisterLazy(Type service, Func<object> factory)
-        => _services.AddSingleton(service, _ => factory());
+    public void RegisterLazy(Type service, Func<object> factory) =>
+        _services.AddSingleton(service, _ => factory());
 }
 
 internal sealed class TypeResolver(IServiceProvider provider) : ITypeResolver, IDisposable

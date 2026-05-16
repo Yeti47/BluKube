@@ -1,0 +1,13 @@
+bin/
+obj/
+out/
+publish/
+packages/
+.local/
+.nuget/
+node_modules/
+coverage/
+TestResults/
+playwright-report/
+.playwright/
+*.lscache

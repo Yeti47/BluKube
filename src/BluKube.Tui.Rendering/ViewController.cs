@@ -17,32 +17,39 @@ public sealed class ViewController(
     BluKubeConnection connection,
     string? initialQuery = null,
     int limit = 10,
-    bool enableQuitKeys = true)
+    bool enableQuitKeys = true
+)
 {
     private readonly IView[] _views =
     [
         new SearchViewController(connection, limit),
         new ResultsViewController(connection),
-        new PlaybackViewController(connection)
+        new PlaybackViewController(connection),
     ];
 
     public async Task RunAsync(CancellationToken ct)
     {
         var state = new UiState { Query = initialQuery ?? string.Empty };
-        var redraw = Channel.CreateUnbounded<bool>(new UnboundedChannelOptions
-        {
-            SingleReader = true,
-            AllowSynchronousContinuations = false
-        });
+        var redraw = Channel.CreateUnbounded<bool>(
+            new UnboundedChannelOptions
+            {
+                SingleReader = true,
+                AllowSynchronousContinuations = false,
+            }
+        );
 
         using var loopCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
 
-        var stateTask = Task.Run(() => PumpStatesAsync(state, redraw, loopCts.Token), loopCts.Token);
-        var keyTask   = Task.Run(() => PumpKeysAsync(state, redraw, loopCts), loopCts.Token);
+        var stateTask = Task.Run(
+            () => PumpStatesAsync(state, redraw, loopCts.Token),
+            loopCts.Token
+        );
+        var keyTask = Task.Run(() => PumpKeysAsync(state, redraw, loopCts), loopCts.Token);
 
         try
         {
-            await console.Live(BuildLayout(state))
+            await console
+                .Live(BuildLayout(state))
                 .StartAsync(async ctx =>
                 {
                     while (await redraw.Reader.WaitToReadAsync(loopCts.Token))
@@ -57,7 +64,10 @@ public sealed class ViewController(
         finally
         {
             loopCts.Cancel();
-            try { await Task.WhenAll(stateTask, keyTask); }
+            try
+            {
+                await Task.WhenAll(stateTask, keyTask);
+            }
             catch (OperationCanceledException) { }
         }
     }
@@ -85,7 +95,11 @@ public sealed class ViewController(
         }
     }
 
-    private async Task PumpKeysAsync(UiState state, Channel<bool> redraw, CancellationTokenSource loopCts)
+    private async Task PumpKeysAsync(
+        UiState state,
+        Channel<bool> redraw,
+        CancellationTokenSource loopCts
+    )
     {
         var ct = loopCts.Token;
         try
@@ -110,7 +124,10 @@ public sealed class ViewController(
                     if (!state.IsBusy)
                         await DispatchAsync(key, state, redraw, ct);
                 }
-                catch (OperationCanceledException) { throw; }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
                 catch (Exception ex)
                 {
                     state.Error = ex.Message;
@@ -126,12 +143,19 @@ public sealed class ViewController(
     // Dispatch
     // -------------------------------------------------------------------------
 
-    private bool ShouldQuit(KeyPress key, ViewMode mode)
-        => enableQuitKeys &&
-           (key is { Key: Key.Q, Ctrl: true } ||
-           key.Key == Key.Q && mode is ViewMode.Results or ViewMode.Player);
+    private bool ShouldQuit(KeyPress key, ViewMode mode) =>
+        enableQuitKeys
+        && (
+            key is { Key: Key.Q, Ctrl: true }
+            || key.Key == Key.Q && mode is ViewMode.Results or ViewMode.Player
+        );
 
-    private Task DispatchAsync(KeyPress key, UiState state, Channel<bool> redraw, CancellationToken ct)
+    private Task DispatchAsync(
+        KeyPress key,
+        UiState state,
+        Channel<bool> redraw,
+        CancellationToken ct
+    )
     {
         var view = _views.FirstOrDefault(v => v.Mode == state.Mode);
         return view?.DispatchAsync(key, state, redraw, ct) ?? Task.CompletedTask;
@@ -145,18 +169,30 @@ public sealed class ViewController(
     {
         IRenderable body = state.Mode switch
         {
-            ViewMode.Search  => new SearchBox(state.Query, state.Status, state.Error),
+            ViewMode.Search => new SearchBox(state.Query, state.Status, state.Error),
             ViewMode.Results => BuildResultsTable(state),
-            ViewMode.Player  => new PlaybackPanel(state.ServerState as PlaybackState, state.CurrentTitle, state.CurrentChannel, state.Error, state.CompactPlayback),
-            _                => new Markup(string.Empty)
+            ViewMode.Player => new PlaybackPanel(
+                state.ServerState as PlaybackState,
+                state.CurrentTitle,
+                state.CurrentChannel,
+                state.Error,
+                state.CompactPlayback
+            ),
+            _ => new Markup(string.Empty),
         };
 
         var footer = state.Mode switch
         {
-            ViewMode.Search  => enableQuitKeys ? "enter search  •  esc clear  •  ctrl+q quit" : "enter search  •  esc clear",
-            ViewMode.Results => enableQuitKeys ? "↑/↓ select  •  ←/→ page  •  enter play  •  esc search  •  q quit" : "↑/↓ select  •  ←/→ page  •  enter play  •  esc search",
-            ViewMode.Player  => enableQuitKeys ? "space play/pause  •  ←/→ seek  •  ↑/↓ volume  •  alt+c compact  •  alt+x clear  •  esc search  •  q quit" : "space play/pause  •  ←/→ seek  •  ↑/↓ volume  •  alt+c compact  •  alt+x clear  •  esc search",
-            _                => string.Empty
+            ViewMode.Search => enableQuitKeys
+                ? "enter search  •  esc clear  •  ctrl+q quit"
+                : "enter search  •  esc clear",
+            ViewMode.Results => enableQuitKeys
+                ? "↑/↓ select  •  ←/→ page  •  enter play  •  esc search  •  q quit"
+                : "↑/↓ select  •  ←/→ page  •  enter play  •  esc search",
+            ViewMode.Player => enableQuitKeys
+                ? "space play/pause  •  ←/→ seek  •  ↑/↓ volume  •  alt+c compact  •  alt+x clear  •  esc search  •  q quit"
+                : "space play/pause  •  ←/→ seek  •  ↑/↓ volume  •  alt+c compact  •  alt+x clear  •  esc search",
+            _ => string.Empty,
         };
 
         return new AppShell(body, footer);
@@ -172,4 +208,3 @@ public sealed class ViewController(
         return new ResultsTable(pageItems, localIndex, state.IsBusy, state.Query, pageInfo);
     }
 }
-

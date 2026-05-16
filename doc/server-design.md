@@ -50,12 +50,12 @@ flowchart TB
 
 ### What each layer owns
 
-| Layer | Owns | Knows about |
-|---|---|---|
-| L1 Engine | Playwright, Brave, Xvfb, DOM scripts, page navigation | Nothing above |
-| L2 Domain | Verbs (`PlayAsync`, `SearchAsync`), polling cadence, error mapping to domain errors | L1 |
-| L3 Session | Session identity, lifecycle, snapshot fan-out, audio stream access, idle timeout | L2 |
-| L4 Transport | SignalR contract, auth, REST endpoints | L3 |
+| Layer        | Owns                                                                                | Knows about   |
+| ------------ | ----------------------------------------------------------------------------------- | ------------- |
+| L1 Engine    | Playwright, Brave, Xvfb, DOM scripts, page navigation                               | Nothing above |
+| L2 Domain    | Verbs (`PlayAsync`, `SearchAsync`), polling cadence, error mapping to domain errors | L1            |
+| L3 Session   | Session identity, lifecycle, snapshot fan-out, audio stream access, idle timeout    | L2            |
+| L4 Transport | SignalR contract, auth, REST endpoints                                              | L3            |
 
 The **testable seam** is L2. Hub and session logic test against fakes implementing `IMediaPlayer` / `IMediaSearch`. Real Brave is exercised only by Docker-only tests at L1/L2.
 
@@ -171,11 +171,11 @@ public sealed record ErrorState(string Code, string Message,
 
 Command replies, state updates, and audio packets are separate flows:
 
-| Channel | Purpose | Direction |
-|---|---|---|
-| Hub method return | Acknowledge a command, surface validation errors | request/reply |
-| `StreamStates()` | Continuous, eventually-consistent view of `SessionState` | server -> client |
-| `StreamAudio()` | Opus packets captured from the session's PulseAudio monitor | server -> client |
+| Channel           | Purpose                                                     | Direction        |
+| ----------------- | ----------------------------------------------------------- | ---------------- |
+| Hub method return | Acknowledge a command, surface validation errors            | request/reply    |
+| `StreamStates()`  | Continuous, eventually-consistent view of `SessionState`    | server -> client |
+| `StreamAudio()`   | Opus packets captured from the session's PulseAudio monitor | server -> client |
 
 Hub methods return `Task` (fire-and-forget) or `Task<SessionState>` for "what does the world look like right after this command". The stream is the source of truth; the reply is a convenience for clients that want a synchronous confirmation.
 
@@ -231,13 +231,13 @@ public class SessionHub : Hub<ISessionClient>
 
 Plus thin REST for scripting / inspection:
 
-| Verb | Path | Purpose |
-|---|---|---|
-| `GET` | `/v1/sessions` | List sessions |
-| `POST` | `/v1/sessions` | Create session |
-| `DELETE` | `/v1/sessions/{id}` | Close session |
-| `GET` | `/v1/sessions/{id}/state` | Snapshot |
-| `GET` | `/health`, `/alive` | Liveness/readiness |
+| Verb     | Path                      | Purpose            |
+| -------- | ------------------------- | ------------------ |
+| `GET`    | `/v1/sessions`            | List sessions      |
+| `POST`   | `/v1/sessions`            | Create session     |
+| `DELETE` | `/v1/sessions/{id}`       | Close session      |
+| `GET`    | `/v1/sessions/{id}/state` | Snapshot           |
+| `GET`    | `/health`, `/alive`       | Liveness/readiness |
 
 Auth: bearer token middleware applied to `/v1/*` and the hub. Health endpoints stay open.
 

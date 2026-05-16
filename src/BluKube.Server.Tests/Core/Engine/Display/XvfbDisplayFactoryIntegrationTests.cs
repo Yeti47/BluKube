@@ -9,7 +9,7 @@ public sealed class XvfbDisplayFactoryIntegrationTests
     public async Task CreateAsync_CreatesDisplayAndCleansUp()
     {
         var factory = new XvfbDisplayFactory();
-        
+
         IDisplay display;
         int displayNumber = -1;
 
@@ -19,14 +19,18 @@ public sealed class XvfbDisplayFactoryIntegrationTests
             var xvfbDisplay = (XvfbDisplay)display;
 
             displayNumber = xvfbDisplay.DisplayNumber;
-            Assert.InRange(displayNumber, XvfbDisplayFactory.MinDisplayNumber, XvfbDisplayFactory.MaxDisplayNumber);
+            Assert.InRange(
+                displayNumber,
+                XvfbDisplayFactory.MinDisplayNumber,
+                XvfbDisplayFactory.MaxDisplayNumber
+            );
             Assert.True(factory.DisplaySocketExists(displayNumber));
         }
 
         const int timeoutSeconds = 3;
 
-        var socketRemovalTask = Task.Run(async () => {
-
+        var socketRemovalTask = Task.Run(async () =>
+        {
             while (factory.DisplaySocketExists(displayNumber))
             {
                 await Task.Delay(100);
@@ -36,8 +40,10 @@ public sealed class XvfbDisplayFactoryIntegrationTests
         var timeoutTask = Task.Delay(TimeSpan.FromSeconds(timeoutSeconds));
         var completedTask = await Task.WhenAny(socketRemovalTask, timeoutTask);
 
-        Assert.True(completedTask == socketRemovalTask,
-            $"Display socket for :{displayNumber} was not cleaned up within {timeoutSeconds} seconds");
+        Assert.True(
+            completedTask == socketRemovalTask,
+            $"Display socket for :{displayNumber} was not cleaned up within {timeoutSeconds} seconds"
+        );
     }
 
     [DockerOnlyFactAttribute]

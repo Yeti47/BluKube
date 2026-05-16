@@ -164,6 +164,19 @@ dotnet publish src/BluKube.Tui/BluKube.Tui.csproj -c Release -o publish/tui
 docker compose build && BLUKUBE_TOKEN=replace-me docker compose up -d
 ```
 
+Formatting uses repo-local tools:
+
+```bash
+dotnet tool restore
+npm install
+npm run format
+npm run format:check
+```
+
+`CSharpier` handles the C# and XML side of the tree.
+`Prettier` handles JS, CSS, JSON, Markdown, and YAML.
+Razor files are not covered by either tool yet, so those still rely on the built-in Razor formatter.
+
 If you want only the server build:
 
 ```bash

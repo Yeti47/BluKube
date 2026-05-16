@@ -14,36 +14,51 @@ public static class SessionsEndpoints
     {
         var group = app.MapGroup("/v1/sessions");
 
-        group.MapGet("/", async (ISessionManager manager) =>
-        {
-            var sessions = await manager.ListSessionsAsync();
-            return Results.Ok(sessions.Select(SessionSummary.From));
-        });
-
-        group.MapPost("/", async (ISessionManager manager, CancellationToken ct) =>
-        {
-            try
+        group.MapGet(
+            "/",
+            async (ISessionManager manager) =>
             {
-                var session = await manager.CreateSessionAsync(ct);
-                return Results.Created($"/v1/sessions/{session.Id}", SessionSummary.From(session));
+                var sessions = await manager.ListSessionsAsync();
+                return Results.Ok(sessions.Select(SessionSummary.From));
             }
-            catch (InvalidOperationException ex)
+        );
+
+        group.MapPost(
+            "/",
+            async (ISessionManager manager, CancellationToken ct) =>
             {
-                return Results.Problem(ex.Message, statusCode: StatusCodes.Status409Conflict);
+                try
+                {
+                    var session = await manager.CreateSessionAsync(ct);
+                    return Results.Created(
+                        $"/v1/sessions/{session.Id}",
+                        SessionSummary.From(session)
+                    );
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return Results.Problem(ex.Message, statusCode: StatusCodes.Status409Conflict);
+                }
             }
-        });
+        );
 
-        group.MapDelete("/{id:guid}", async (Guid id, ISessionManager manager) =>
-        {
-            var removed = await manager.RemoveSessionAsync(id);
-            return removed ? Results.NoContent() : Results.NotFound();
-        });
+        group.MapDelete(
+            "/{id:guid}",
+            async (Guid id, ISessionManager manager) =>
+            {
+                var removed = await manager.RemoveSessionAsync(id);
+                return removed ? Results.NoContent() : Results.NotFound();
+            }
+        );
 
-        group.MapGet("/{id:guid}/state", async (Guid id, ISessionManager manager) =>
-        {
-            var session = await manager.GetSessionAsync(id);
-            return session is null ? Results.NotFound() : Results.Ok(session.Current);
-        });
+        group.MapGet(
+            "/{id:guid}/state",
+            async (Guid id, ISessionManager manager) =>
+            {
+                var session = await manager.GetSessionAsync(id);
+                return session is null ? Results.NotFound() : Results.Ok(session.Current);
+            }
+        );
 
         return app;
     }

@@ -19,9 +19,10 @@ public sealed partial class XvfbDisplayFactory(string socketDirectory = "") : ID
         if (!IsXvfbAvailable())
         {
             throw new InvalidOperationException(
-                "Xvfb is required for invisible playback but was not found on PATH. " +
-                "Install it with: sudo apt-get install xvfb  (Debian/Ubuntu) " +
-                "or: sudo dnf install xorg-x11-server-Xvfb  (Fedora).");
+                "Xvfb is required for invisible playback but was not found on PATH. "
+                    + "Install it with: sudo apt-get install xvfb  (Debian/Ubuntu) "
+                    + "or: sudo dnf install xorg-x11-server-Xvfb  (Fedora)."
+            );
         }
 
         var number = GetNextAvailableDisplayNumber();
@@ -33,17 +34,21 @@ public sealed partial class XvfbDisplayFactory(string socketDirectory = "") : ID
             ArgumentList =
             {
                 displayValue,
-                "-screen", "0", "1280x720x24",
-                "-nolisten", "tcp",
-                "-noreset"
+                "-screen",
+                "0",
+                "1280x720x24",
+                "-nolisten",
+                "tcp",
+                "-noreset",
             },
             UseShellExecute = false,
             RedirectStandardError = true,
             RedirectStandardOutput = true,
-            CreateNoWindow = true
+            CreateNoWindow = true,
         };
 
-        var process = Process.Start(startInfo)
+        var process =
+            Process.Start(startInfo)
             ?? throw new InvalidOperationException("Failed to start Xvfb process.");
 
         var socketReady = WaitForSocketAsync(number, process, cancellationToken);
@@ -56,9 +61,14 @@ public sealed partial class XvfbDisplayFactory(string socketDirectory = "") : ID
             return await socketReady;
         }
 
-        try { process.Kill(entireProcessTree: true); } catch { }
+        try
+        {
+            process.Kill(entireProcessTree: true);
+        }
+        catch { }
         throw new InvalidOperationException(
-            $"Xvfb did not create its display socket (/tmp/.X11-unix/X{number}) within 5 seconds.");
+            $"Xvfb did not create its display socket (/tmp/.X11-unix/X{number}) within 5 seconds."
+        );
     }
 
     public IReadOnlyList<int> GetUsedDisplayNumbers()
@@ -80,8 +90,10 @@ public sealed partial class XvfbDisplayFactory(string socketDirectory = "") : ID
                 continue;
             }
 
-            if (int.TryParse(match.Groups[1].Value, out var number) &&
-                number is >= MinDisplayNumber and <= MaxDisplayNumber)
+            if (
+                int.TryParse(match.Groups[1].Value, out var number)
+                && number is >= MinDisplayNumber and <= MaxDisplayNumber
+            )
             {
                 numbers.Add(number);
             }
@@ -95,7 +107,8 @@ public sealed partial class XvfbDisplayFactory(string socketDirectory = "") : ID
     {
         var used = GetUsedDisplayNumbers();
         var usedSet = new HashSet<int>(used);
-        return Enumerable.Range(MinDisplayNumber, MaxDisplayNumber - MinDisplayNumber + 1)
+        return Enumerable
+            .Range(MinDisplayNumber, MaxDisplayNumber - MinDisplayNumber + 1)
             .First(n => !usedSet.Contains(n));
     }
 
@@ -129,7 +142,8 @@ public sealed partial class XvfbDisplayFactory(string socketDirectory = "") : ID
     private async Task<XvfbDisplay> WaitForSocketAsync(
         int displayNumber,
         Process process,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         while (!cancellationToken.IsCancellationRequested)
         {
@@ -137,7 +151,8 @@ public sealed partial class XvfbDisplayFactory(string socketDirectory = "") : ID
             {
                 var stderr = await process.StandardError.ReadToEndAsync(cancellationToken);
                 throw new InvalidOperationException(
-                    $"Xvfb exited before becoming ready (exit code {process.ExitCode}). {stderr}");
+                    $"Xvfb exited before becoming ready (exit code {process.ExitCode}). {stderr}"
+                );
             }
 
             if (DisplaySocketExists(displayNumber))
@@ -153,6 +168,7 @@ public sealed partial class XvfbDisplayFactory(string socketDirectory = "") : ID
 
         cancellationToken.ThrowIfCancellationRequested();
         throw new InvalidOperationException(
-            $"Xvfb startup was cancelled before display socket appeared.");
+            $"Xvfb startup was cancelled before display socket appeared."
+        );
     }
 }

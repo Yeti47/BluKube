@@ -17,18 +17,15 @@ public abstract record SessionState;
 
 public sealed record IdleState : SessionState;
 
-public sealed record SearchResultsState(
-    string Query,
-    IReadOnlyList<MediaItem> Items) : SessionState;
+public sealed record SearchResultsState(string Query, IReadOnlyList<MediaItem> Items)
+    : SessionState;
 
 public sealed record PlaybackState(
     string VideoId,
     TimeSpan Position,
     TimeSpan Duration,
     bool IsPlaying,
-    float Volume) : SessionState;
+    float Volume
+) : SessionState;
 
-public sealed record ErrorState(
-    string Code,
-    string Message,
-    SessionState? Previous) : SessionState;
+public sealed record ErrorState(string Code, string Message, SessionState? Previous) : SessionState;

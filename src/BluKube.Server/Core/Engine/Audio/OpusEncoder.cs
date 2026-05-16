@@ -10,6 +10,7 @@ namespace BluKube.Server.Core.Engine.Audio;
 internal sealed class OpusEncoder : IDisposable
 {
     private readonly IOpusEncoder _enc;
+
     // Per RFC 6716: Opus packets max 1275 bytes for single-frame, but encoder
     // can emit up to 4000 with internal multi-frame; 1500 is the safe MTU choice.
     public const int MaxPacketBytes = 1500;
@@ -19,7 +20,8 @@ internal sealed class OpusEncoder : IDisposable
         _enc = OpusCodecFactory.CreateEncoder(
             BluKube.Contracts.AudioFormat.SampleRate,
             BluKube.Contracts.AudioFormat.Channels,
-            OpusApplication.OPUS_APPLICATION_AUDIO);
+            OpusApplication.OPUS_APPLICATION_AUDIO
+        );
         _enc.Bitrate = BluKube.Contracts.AudioFormat.Bitrate;
     }
 
@@ -30,7 +32,8 @@ internal sealed class OpusEncoder : IDisposable
             pcmFrame,
             BluKube.Contracts.AudioFormat.SamplesPerFrame,
             buf,
-            buf.Length);
+            buf.Length
+        );
         return buf[..written].ToArray();
     }
 

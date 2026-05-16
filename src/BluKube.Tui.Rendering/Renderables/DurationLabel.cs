@@ -3,10 +3,8 @@ using Spectre.Console.Rendering;
 
 namespace BluKube.Tui.Rendering;
 
-internal sealed class DurationLabel(
-    TimeSpan duration,
-    bool selected = false,
-    bool dim = false) : IRenderable
+internal sealed class DurationLabel(TimeSpan duration, bool selected = false, bool dim = false)
+    : IRenderable
 {
     private IRenderable Build()
     {
@@ -17,9 +15,7 @@ internal sealed class DurationLabel(
         if (dim)
             return new Markup($"[grey]{text}[/]");
 
-        return selected
-            ? new Markup($"[bold blue]{text}[/]")
-            : new Markup(text);
+        return selected ? new Markup($"[bold blue]{text}[/]") : new Markup(text);
     }
 
     public bool IsLive => duration <= TimeSpan.Zero;

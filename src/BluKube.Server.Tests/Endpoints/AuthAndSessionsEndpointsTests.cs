@@ -9,7 +9,8 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace BluKube.Server.Tests.Endpoints;
 
-public sealed class AuthAndSessionsEndpointsTests : IClassFixture<AuthAndSessionsEndpointsTests.Factory>
+public sealed class AuthAndSessionsEndpointsTests
+    : IClassFixture<AuthAndSessionsEndpointsTests.Factory>
 {
     private const string Token = "test-token-abc123";
     private readonly Factory _factory;
@@ -37,7 +38,10 @@ public sealed class AuthAndSessionsEndpointsTests : IClassFixture<AuthAndSession
     public async Task Sessions_RejectsWrongToken()
     {
         using var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "wrong");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            "wrong"
+        );
         var resp = await client.GetAsync("/v1/sessions");
         Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
     }
@@ -103,7 +107,10 @@ public sealed class AuthAndSessionsEndpointsTests : IClassFixture<AuthAndSession
                 services.PostConfigure<BluKube.Server.Configuration.AuthOptions>(opts =>
                 {
                     opts.Token = Token;
-                    opts.TokenFile = Path.Combine(Path.GetTempPath(), $"blukube-test-{Guid.NewGuid():N}.token");
+                    opts.TokenFile = Path.Combine(
+                        Path.GetTempPath(),
+                        $"blukube-test-{Guid.NewGuid():N}.token"
+                    );
                 });
                 // Replace real engine-backed manager with an in-memory fake.
                 services.RemoveAll<ISessionManager>();

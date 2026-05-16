@@ -7,7 +7,11 @@ using Spectre.Console;
 using Spectre.Console.Cli;
 
 var cts = new CancellationTokenSource();
-Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
+Console.CancelKeyPress += (_, e) =>
+{
+    e.Cancel = true;
+    cts.Cancel();
+};
 
 var services = new ServiceCollection();
 services.AddSingleton(AnsiConsole.Console);
@@ -21,7 +25,8 @@ app.Configure(c =>
 {
     c.SetApplicationName("blukube");
     c.AddCommand<PlayCommand>("play").WithDescription("Search and play. Drops into the live TUI.");
-    c.AddCommand<ConfigCommand>("config").WithDescription("Show or clear stored connection config.");
+    c.AddCommand<ConfigCommand>("config")
+        .WithDescription("Show or clear stored connection config.");
 });
 
 return await app.RunAsync(args);

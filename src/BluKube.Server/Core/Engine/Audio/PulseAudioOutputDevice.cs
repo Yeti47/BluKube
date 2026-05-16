@@ -25,39 +25,51 @@ internal sealed class PulseAudioOutputDevice : IAudioOutputDevice
         _logger = logger;
     }
 
-    public static async Task<PulseAudioOutputDevice> CreateAsync(ILogger logger, CancellationToken ct)
+    public static async Task<PulseAudioOutputDevice> CreateAsync(
+        ILogger logger,
+        CancellationToken ct
+    )
     {
         var sinkName = $"blukube_{Guid.NewGuid():N}";
-        var args = $"load-module module-null-sink sink_name={sinkName} sink_properties=device.description=BluKube_{sinkName}";
+        var args =
+            $"load-module module-null-sink sink_name={sinkName} sink_properties=device.description=BluKube_{sinkName}";
         var (stdout, stderr, exit) = await RunPactlAsync(args, ct);
         if (exit != 0)
         {
             throw new InvalidOperationException(
-                $"pactl load-module failed (exit {exit}): {stderr.Trim()}");
+                $"pactl load-module failed (exit {exit}): {stderr.Trim()}"
+            );
         }
 
         var moduleId = stdout.Trim();
         if (string.IsNullOrEmpty(moduleId) || !moduleId.All(char.IsDigit))
         {
             throw new InvalidOperationException(
-                $"pactl returned unexpected module id '{moduleId}'");
+                $"pactl returned unexpected module id '{moduleId}'"
+            );
         }
 
-        logger.LogInformation("Created PulseAudio sink {Sink} (module {Module})", sinkName, moduleId);
+        logger.LogInformation(
+            "Created PulseAudio sink {Sink} (module {Module})",
+            sinkName,
+            moduleId
+        );
         return new PulseAudioOutputDevice(sinkName, moduleId, logger);
     }
 
     public async IAsyncEnumerable<byte[]> StreamOpusAsync(
-        [EnumeratorCancellation] CancellationToken ct)
+        [EnumeratorCancellation] CancellationToken ct
+    )
     {
-        if (_disposed) throw new ObjectDisposedException(nameof(PulseAudioOutputDevice));
+        if (_disposed)
+            throw new ObjectDisposedException(nameof(PulseAudioOutputDevice));
 
         using var encoder = new OpusEncoder();
         var psi = new ProcessStartInfo("parec")
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,
-            UseShellExecute = false
+            UseShellExecute = false,
         };
         psi.ArgumentList.Add($"--device={SinkName}.monitor");
         psi.ArgumentList.Add("--rate=" + BluKube.Contracts.AudioFormat.SampleRate);
@@ -73,27 +85,38 @@ internal sealed class PulseAudioOutputDevice : IAudioOutputDevice
         }
 
         // Drain stderr so the subprocess never blocks writing diagnostics.
-        _ = Task.Run(async () =>
-        {
-            try
+        _ = Task.Run(
+            async () =>
             {
-                var err = await proc.StandardError.ReadToEndAsync();
-                if (!string.IsNullOrWhiteSpace(err))
+                try
                 {
-                    _logger.LogDebug("parec stderr ({Sink}): {Err}", SinkName, err.Trim());
+                    var err = await proc.StandardError.ReadToEndAsync();
+                    if (!string.IsNullOrWhiteSpace(err))
+                    {
+                        _logger.LogDebug("parec stderr ({Sink}): {Err}", SinkName, err.Trim());
+                    }
                 }
-            }
-            catch { /* parec gone */ }
-        }, CancellationToken.None);
+                catch
+                { /* parec gone */
+                }
+            },
+            CancellationToken.None
+        );
 
         await using var killOnCancel = ct.Register(() =>
         {
-            try { if (!proc.HasExited) proc.Kill(entireProcessTree: true); } catch { }
+            try
+            {
+                if (!proc.HasExited)
+                    proc.Kill(entireProcessTree: true);
+            }
+            catch { }
         });
 
         var pcmBytes = new byte[BluKube.Contracts.AudioFormat.PcmBytesPerFrame];
-        var pcmShorts = new short[BluKube.Contracts.AudioFormat.SamplesPerFrame
-                                  * BluKube.Contracts.AudioFormat.Channels];
+        var pcmShorts = new short[
+            BluKube.Contracts.AudioFormat.SamplesPerFrame * BluKube.Contracts.AudioFormat.Channels
+        ];
         var stdout = proc.StandardOutput.BaseStream;
 
         while (!ct.IsCancellationRequested)
@@ -106,7 +129,10 @@ internal sealed class PulseAudioOutputDevice : IAudioOutputDevice
                 {
                     n = await stdout.ReadAsync(pcmBytes.AsMemory(read), ct);
                 }
-                catch (OperationCanceledException) { yield break; }
+                catch (OperationCanceledException)
+                {
+                    yield break;
+                }
 
                 if (n == 0)
                 {
@@ -130,21 +156,34 @@ internal sealed class PulseAudioOutputDevice : IAudioOutputDevice
             yield return packet;
         }
 
-        try { if (!proc.HasExited) proc.Kill(entireProcessTree: true); } catch { }
+        try
+        {
+            if (!proc.HasExited)
+                proc.Kill(entireProcessTree: true);
+        }
+        catch { }
     }
 
     public async ValueTask DisposeAsync()
     {
-        if (_disposed) return;
+        if (_disposed)
+            return;
         _disposed = true;
 
         try
         {
-            var (_, stderr, exit) = await RunPactlAsync($"unload-module {_moduleId}", CancellationToken.None);
+            var (_, stderr, exit) = await RunPactlAsync(
+                $"unload-module {_moduleId}",
+                CancellationToken.None
+            );
             if (exit != 0)
             {
-                _logger.LogWarning("pactl unload-module {Module} failed (exit {Exit}): {Err}",
-                    _moduleId, exit, stderr.Trim());
+                _logger.LogWarning(
+                    "pactl unload-module {Module} failed (exit {Exit}): {Err}",
+                    _moduleId,
+                    exit,
+                    stderr.Trim()
+                );
             }
         }
         catch (Exception ex)
@@ -154,17 +193,19 @@ internal sealed class PulseAudioOutputDevice : IAudioOutputDevice
     }
 
     private static async Task<(string Stdout, string Stderr, int Exit)> RunPactlAsync(
-        string args, CancellationToken ct)
+        string args,
+        CancellationToken ct
+    )
     {
         var psi = new ProcessStartInfo("pactl")
         {
             Arguments = args,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
-            UseShellExecute = false
+            UseShellExecute = false,
         };
-        using var proc = Process.Start(psi)
-            ?? throw new InvalidOperationException("Failed to start pactl");
+        using var proc =
+            Process.Start(psi) ?? throw new InvalidOperationException("Failed to start pactl");
 
         var outTask = proc.StandardOutput.ReadToEndAsync();
         var errTask = proc.StandardError.ReadToEndAsync();

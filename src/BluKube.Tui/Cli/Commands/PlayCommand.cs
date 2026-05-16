@@ -12,7 +12,8 @@ namespace BluKube.Tui.Cli.Commands;
 public sealed class PlayCommand(
     ConnectionResolver resolver,
     IAnsiConsole console,
-    CancellationToken ct) : AsyncCommand<PlayCommand.Settings>
+    CancellationToken ct
+) : AsyncCommand<PlayCommand.Settings>
 {
     public sealed class Settings : GlobalSettings
     {
@@ -41,31 +42,62 @@ public sealed class PlayCommand(
         {
             audio = new AudioPlayer();
             audioCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            audioTask = Task.Run(async () =>
-            {
-                try { await audio.PlayAsync(conn.StreamAudioAsync(audioCts.Token), audioCts.Token); }
-                catch (OperationCanceledException) { }
-                catch (Exception ex) { console.MarkupLine($"[yellow]audio stopped:[/] {Markup.Escape(ex.Message)}"); }
-            }, audioCts.Token);
+            audioTask = Task.Run(
+                async () =>
+                {
+                    try
+                    {
+                        await audio.PlayAsync(
+                            conn.StreamAudioAsync(audioCts.Token),
+                            audioCts.Token
+                        );
+                    }
+                    catch (OperationCanceledException) { }
+                    catch (Exception ex)
+                    {
+                        console.MarkupLine(
+                            $"[yellow]audio stopped:[/] {Markup.Escape(ex.Message)}"
+                        );
+                    }
+                },
+                audioCts.Token
+            );
 
             var view = new ViewController(console, new ConsoleKeyInput(), conn, s.Query, s.Limit);
             await view.RunAsync(ct);
         }
         finally
         {
-            try { audioCts?.Cancel(); } catch { }
+            try
+            {
+                audioCts?.Cancel();
+            }
+            catch { }
             if (audioTask is not null)
             {
-                try { await audioTask; } catch { }
+                try
+                {
+                    await audioTask;
+                }
+                catch { }
             }
             if (audio is not null)
             {
-                try { await audio.DisposeAsync(); } catch { }
+                try
+                {
+                    await audio.DisposeAsync();
+                }
+                catch { }
             }
 
             audioCts?.Dispose();
-            try { await conn.CloseSessionAsync(sessionId, CancellationToken.None); }
-            catch { /* best-effort */ }
+            try
+            {
+                await conn.CloseSessionAsync(sessionId, CancellationToken.None);
+            }
+            catch
+            { /* best-effort */
+            }
         }
         return 0;
     }

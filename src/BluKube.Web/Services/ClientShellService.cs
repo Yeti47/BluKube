@@ -3,19 +3,28 @@ using Microsoft.JSInterop;
 
 namespace BluKube.Web.Services;
 
-public enum ClientState { Loading, Login, Client }
+public enum ClientState
+{
+    Loading,
+    Login,
+    Client,
+}
 
-public enum ClientView { Terminal, Native }
+public enum ClientView
+{
+    Terminal,
+    Native,
+}
 
 public sealed class ClientShellService(
     IJSRuntime js,
     ClientSessionService session,
-    AudioStreamService audio,
-    TerminalClientService terminal,
-    NativeClientService native)
+    IEnumerable<IClientViewService> clients
+)
 {
-    private bool _pendingTerminalInit;
-    private bool _pendingNativeInit;
+    private readonly IReadOnlyDictionary<ClientView, IClientViewService> _clients =
+        clients.ToDictionary(client => client.View);
+    private bool _pendingClientInit;
 
     public event EventHandler? StateChanged;
 
@@ -23,6 +32,8 @@ public sealed class ClientShellService(
     public ClientView View { get; private set; } = ClientView.Terminal;
     public bool IsNativeView => View == ClientView.Native;
     public string PageClass => IsNativeView ? "native-page" : "terminal-page";
+
+    private IClientViewService CurrentClient => _clients[View];
 
     public async Task InitializeAsync()
     {
@@ -53,10 +64,10 @@ public sealed class ClientShellService(
         await session.ClearSettingsAsync();
         await StopAsync();
 
-        native.Query = string.Empty;
-        native.Reset();
-        _pendingTerminalInit = false;
-        _pendingNativeInit = false;
+        foreach (var client in _clients.Values)
+            client.ClearState();
+
+        _pendingClientInit = false;
         State = ClientState.Login;
         NotifyStateChanged();
     }
@@ -67,67 +78,36 @@ public sealed class ClientShellService(
 
     public async Task StartPendingClientAsync(DotNetObjectReference<Home>? homeReference)
     {
-        if (_pendingTerminalInit)
-        {
-            _pendingTerminalInit = false;
-            try
-            {
-                if (homeReference is not null)
-                    await terminal.StartAsync(homeReference);
-            }
-            catch (Exception ex)
-            {
-                terminal.WriteError(ex.Message);
-            }
-        }
+        if (!_pendingClientInit)
+            return;
 
-        if (_pendingNativeInit)
-        {
-            _pendingNativeInit = false;
-            try
-            {
-                await native.StartAsync();
-            }
-            catch (Exception ex)
-            {
-                native.SetError(ex.Message);
-                NotifyStateChanged();
-            }
-        }
+        _pendingClientInit = false;
+        await CurrentClient.ActivateAsync(homeReference);
     }
 
     public void PostKey(string key, bool shift, bool ctrl, bool alt) =>
-        terminal.PostKey(key, shift, ctrl, alt);
+        CurrentClient.PostKey(key, shift, ctrl, alt);
 
     public async Task StopAsync(bool resetSession = true)
     {
-        await session.StopAsync(terminal.ViewTask, terminal.PumpTask, audio.PumpTask, native.StateTask);
-        await terminal.DisposeXtermAsync();
-
-        terminal.ClearTasks();
-        native.ClearTasks();
-        audio.Clear();
-
-        if (resetSession)
-            session.ResetCancellation();
+        await CurrentClient.DeactivateAsync(resetSession);
     }
 
     private async Task SwitchClientViewAsync(ClientView view)
     {
-        if (View == view) return;
+        if (View == view)
+            return;
 
         await StopAsync();
 
         View = view;
-        native.Reset();
         QueueClientInit();
         NotifyStateChanged();
     }
 
     private void QueueClientInit()
     {
-        _pendingTerminalInit = View == ClientView.Terminal;
-        _pendingNativeInit = View == ClientView.Native;
+        _pendingClientInit = true;
     }
 
     private async Task<ClientView> PreferNativeClientAsync()

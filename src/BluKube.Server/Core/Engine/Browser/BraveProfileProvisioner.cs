@@ -2,15 +2,16 @@ using Microsoft.Extensions.Logging;
 
 namespace BluKube.Server.Core.Engine.Browser;
 
-public sealed class BraveProfileProvisioner(ILogger<BraveProfileProvisioner>? logger = null) : IBraveProfileProvisioner
+public sealed class BraveProfileProvisioner(ILogger<BraveProfileProvisioner>? logger = null)
+    : IBraveProfileProvisioner
 {
     private const string DefaultProfileRoot = "/var/lib/blukube/brave-profiles";
-    
+
     private static readonly string[] DefaultProfileSeeds =
     [
         "/var/lib/blukube/brave-profile",
         "/var/lib/blukube/brave-warm",
-        "/var/lib/blukube/brave-profile-seed"
+        "/var/lib/blukube/brave-profile-seed",
     ];
 
     public Task<BraveProfileLease> CreateAsync(CancellationToken cancellationToken)
@@ -54,7 +55,11 @@ public sealed class BraveProfileProvisioner(ILogger<BraveProfileProvisioner>? lo
         return DefaultProfileSeeds.FirstOrDefault(Directory.Exists);
     }
 
-    private static void CopyProfileSeed(string sourceRoot, string targetRoot, CancellationToken cancellationToken)
+    private static void CopyProfileSeed(
+        string sourceRoot,
+        string targetRoot,
+        CancellationToken cancellationToken
+    )
     {
         foreach (var sourcePath in Directory.EnumerateFileSystemEntries(sourceRoot))
         {
@@ -69,7 +74,8 @@ public sealed class BraveProfileProvisioner(ILogger<BraveProfileProvisioner>? lo
         string sourceRoot,
         string sourcePath,
         string targetRoot,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -99,26 +105,29 @@ public sealed class BraveProfileProvisioner(ILogger<BraveProfileProvisioner>? lo
         var path = relativePath.Replace(Path.DirectorySeparatorChar, '/');
         var name = Path.GetFileName(path);
 
-        if (path == "sessions" || path.StartsWith("sessions/", StringComparison.Ordinal)) return true;
-        if (name.StartsWith("Singleton", StringComparison.Ordinal)) return true;
-        if (name is "LOCK" or "LOG" or "LOG.old") return true;
+        if (path == "sessions" || path.StartsWith("sessions/", StringComparison.Ordinal))
+            return true;
+        if (name.StartsWith("Singleton", StringComparison.Ordinal))
+            return true;
+        if (name is "LOCK" or "LOG" or "LOG.old")
+            return true;
 
-        return path == "Default/Sessions" ||
-               path.StartsWith("Default/Sessions/", StringComparison.Ordinal) ||
-               path == "Default/Session Storage" ||
-               path.StartsWith("Default/Session Storage/", StringComparison.Ordinal) ||
-               path == "Default/Cache" ||
-               path.StartsWith("Default/Cache/", StringComparison.Ordinal) ||
-               path == "Default/Code Cache" ||
-               path.StartsWith("Default/Code Cache/", StringComparison.Ordinal) ||
-               path == "Default/GPUCache" ||
-               path.StartsWith("Default/GPUCache/", StringComparison.Ordinal) ||
-               path == "Default/DawnWebGPUCache" ||
-               path.StartsWith("Default/DawnWebGPUCache/", StringComparison.Ordinal) ||
-               path == "Default/DawnGraphiteCache" ||
-               path.StartsWith("Default/DawnGraphiteCache/", StringComparison.Ordinal) ||
-               path == "Default/blob_storage" ||
-               path.StartsWith("Default/blob_storage/", StringComparison.Ordinal);
+        return path == "Default/Sessions"
+            || path.StartsWith("Default/Sessions/", StringComparison.Ordinal)
+            || path == "Default/Session Storage"
+            || path.StartsWith("Default/Session Storage/", StringComparison.Ordinal)
+            || path == "Default/Cache"
+            || path.StartsWith("Default/Cache/", StringComparison.Ordinal)
+            || path == "Default/Code Cache"
+            || path.StartsWith("Default/Code Cache/", StringComparison.Ordinal)
+            || path == "Default/GPUCache"
+            || path.StartsWith("Default/GPUCache/", StringComparison.Ordinal)
+            || path == "Default/DawnWebGPUCache"
+            || path.StartsWith("Default/DawnWebGPUCache/", StringComparison.Ordinal)
+            || path == "Default/DawnGraphiteCache"
+            || path.StartsWith("Default/DawnGraphiteCache/", StringComparison.Ordinal)
+            || path == "Default/blob_storage"
+            || path.StartsWith("Default/blob_storage/", StringComparison.Ordinal);
     }
 
     private static void RemoveVolatileProfileState(string profilePath)
@@ -126,10 +135,18 @@ public sealed class BraveProfileProvisioner(ILogger<BraveProfileProvisioner>? lo
         DeleteDirectory(Path.Combine(profilePath, "Default", "Sessions"));
         DeleteDirectory(Path.Combine(profilePath, "Default", "Session Storage"));
 
-        foreach (var fileName in new[]
-        {
-            "Current Session", "Current Tabs", "Last Session", "Last Tabs", "LOCK", "LOG", "LOG.old"
-        })
+        foreach (
+            var fileName in new[]
+            {
+                "Current Session",
+                "Current Tabs",
+                "Last Session",
+                "Last Tabs",
+                "LOCK",
+                "LOG",
+                "LOG.old",
+            }
+        )
         {
             DeleteFile(Path.Combine(profilePath, "Default", fileName));
         }
@@ -139,7 +156,8 @@ public sealed class BraveProfileProvisioner(ILogger<BraveProfileProvisioner>? lo
     {
         try
         {
-            if (Directory.Exists(path)) Directory.Delete(path, recursive: true);
+            if (Directory.Exists(path))
+                Directory.Delete(path, recursive: true);
         }
         catch { }
     }
@@ -148,7 +166,8 @@ public sealed class BraveProfileProvisioner(ILogger<BraveProfileProvisioner>? lo
     {
         try
         {
-            if (File.Exists(path)) File.Delete(path);
+            if (File.Exists(path))
+                File.Delete(path);
         }
         catch { }
     }

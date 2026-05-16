@@ -15,7 +15,11 @@ public sealed class AudioStreamService(IJSRuntime js, ClientSessionService sessi
 
     public async Task ResumeAsync()
     {
-        try { await js.InvokeVoidAsync("xtermBridge.resumeAudio"); } catch { }
+        try
+        {
+            await js.InvokeVoidAsync("xtermBridge.resumeAudio");
+        }
+        catch { }
     }
 
     public void Clear() => PumpTask = null;
@@ -23,7 +27,8 @@ public sealed class AudioStreamService(IJSRuntime js, ClientSessionService sessi
     private async Task PumpAudioAsync(Action<string>? onError)
     {
         var connection = session.Connection;
-        if (connection is null) return;
+        if (connection is null)
+            return;
 
         var decoder = OpusCodecFactory.CreateDecoder(AudioFormat.SampleRate, AudioFormat.Channels);
         var pcm = new short[AudioFormat.SamplesPerFrame * AudioFormat.Channels];
@@ -45,7 +50,8 @@ public sealed class AudioStreamService(IJSRuntime js, ClientSessionService sessi
                     continue;
                 }
 
-                if (decodedSamples <= 0) continue;
+                if (decodedSamples <= 0)
+                    continue;
 
                 var byteCount = decodedSamples * AudioFormat.Channels * sizeof(short);
                 if (batchBytes + byteCount > batch.Length && batchBytes > 0)
@@ -53,7 +59,8 @@ public sealed class AudioStreamService(IJSRuntime js, ClientSessionService sessi
                     await js.InvokeVoidAsync(
                         "xtermBridge.writeAudio",
                         session.Token,
-                        Convert.ToBase64String(batch, 0, batchBytes));
+                        Convert.ToBase64String(batch, 0, batchBytes)
+                    );
                     batchBytes = 0;
                     batchFrames = 0;
                 }
@@ -62,12 +69,14 @@ public sealed class AudioStreamService(IJSRuntime js, ClientSessionService sessi
                 batchBytes += byteCount;
                 batchFrames++;
 
-                if (batchFrames < 4) continue;
+                if (batchFrames < 4)
+                    continue;
 
                 await js.InvokeVoidAsync(
                     "xtermBridge.writeAudio",
                     session.Token,
-                    Convert.ToBase64String(batch, 0, batchBytes));
+                    Convert.ToBase64String(batch, 0, batchBytes)
+                );
                 batchBytes = 0;
                 batchFrames = 0;
             }
@@ -77,7 +86,8 @@ public sealed class AudioStreamService(IJSRuntime js, ClientSessionService sessi
                 await js.InvokeVoidAsync(
                     "xtermBridge.writeAudio",
                     session.Token,
-                    Convert.ToBase64String(batch, 0, batchBytes));
+                    Convert.ToBase64String(batch, 0, batchBytes)
+                );
             }
         }
         catch (OperationCanceledException) { }

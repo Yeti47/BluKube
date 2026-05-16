@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using BluKube.Server.Configuration;
-using BluKube.Server.Core.Engine.Audio;
 using BluKube.Server.Core.Domain;
+using BluKube.Server.Core.Engine.Audio;
 using BluKube.Server.Core.Engine.Browser;
 using BluKube.Server.Core.Engine.Display;
 using Microsoft.Extensions.Options;
@@ -26,7 +26,8 @@ public sealed class SessionManager : ISessionManager, IAsyncDisposable
         IAudioOutputDeviceFactory audioFactory,
         IOptions<SessionLimits> options,
         ILogger<SessionManager> logger,
-        TimeProvider? clock = null)
+        TimeProvider? clock = null
+    )
     {
         _displayFactory = displayFactory;
         _browserLauncher = browserLauncher;
@@ -37,12 +38,15 @@ public sealed class SessionManager : ISessionManager, IAsyncDisposable
         _sweeper = Task.Run(SweepLoopAsync);
     }
 
-    public async Task<IBrowserSession> CreateSessionAsync(CancellationToken cancellationToken = default)
+    public async Task<IBrowserSession> CreateSessionAsync(
+        CancellationToken cancellationToken = default
+    )
     {
         if (_sessions.Count >= _options.MaxSessions)
         {
             throw new InvalidOperationException(
-                $"Session cap reached ({_options.MaxSessions}). Close an existing session and retry.");
+                $"Session cap reached ({_options.MaxSessions}). Close an existing session and retry."
+            );
         }
 
         IDisplay? display = null;
@@ -53,7 +57,11 @@ public sealed class SessionManager : ISessionManager, IAsyncDisposable
         {
             display = await _displayFactory.CreateAsync(cancellationToken);
             audio = await _audioFactory.CreateAsync(cancellationToken);
-            browser = await _browserLauncher.LaunchAsync(display, audio.SinkName, cancellationToken);
+            browser = await _browserLauncher.LaunchAsync(
+                display,
+                audio.SinkName,
+                cancellationToken
+            );
 
             var player = new BraveMediaPlayer(display, browser);
             display = null;
@@ -74,7 +82,8 @@ public sealed class SessionManager : ISessionManager, IAsyncDisposable
                 _sessions.TryRemove(session.Id, out _);
                 await session.DisposeAsync();
                 throw new InvalidOperationException(
-                    $"Session cap reached ({_options.MaxSessions}). Close an existing session and retry.");
+                    $"Session cap reached ({_options.MaxSessions}). Close an existing session and retry."
+                );
             }
 
             return session;
@@ -83,15 +92,27 @@ public sealed class SessionManager : ISessionManager, IAsyncDisposable
         {
             if (browser is not null)
             {
-                try { await browser.DisposeAsync(); } catch { }
+                try
+                {
+                    await browser.DisposeAsync();
+                }
+                catch { }
             }
             if (audio is not null)
             {
-                try { await audio.DisposeAsync(); } catch { }
+                try
+                {
+                    await audio.DisposeAsync();
+                }
+                catch { }
             }
             if (display is not null)
             {
-                try { await display.DisposeAsync(); } catch { }
+                try
+                {
+                    await display.DisposeAsync();
+                }
+                catch { }
             }
             throw;
         }
@@ -116,7 +137,8 @@ public sealed class SessionManager : ISessionManager, IAsyncDisposable
     public Task<IReadOnlyList<IBrowserSession>> ListSessionsAsync()
     {
         return Task.FromResult<IReadOnlyList<IBrowserSession>>(
-            _sessions.Values.Cast<IBrowserSession>().ToList());
+            _sessions.Values.Cast<IBrowserSession>().ToList()
+        );
     }
 
     private async Task SweepLoopAsync()
@@ -130,7 +152,9 @@ public sealed class SessionManager : ISessionManager, IAsyncDisposable
                 await SweepOnceAsync();
             }
         }
-        catch (OperationCanceledException) { /* dispose */ }
+        catch (OperationCanceledException)
+        { /* dispose */
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Idle session sweeper crashed");
@@ -142,14 +166,20 @@ public sealed class SessionManager : ISessionManager, IAsyncDisposable
         var cutoff = _clock.GetUtcNow() - _options.IdleTimeout;
         foreach (var (id, session) in _sessions)
         {
-            if (session.LastActivityAt > cutoff) continue;
+            if (session.LastActivityAt > cutoff)
+                continue;
 
             if (_sessions.TryRemove(id, out var removed))
             {
                 _logger.LogInformation(
                     "Reaping idle session {SessionId} (last activity {LastActivity:o})",
-                    id, removed.LastActivityAt);
-                try { await removed.DisposeAsync(); }
+                    id,
+                    removed.LastActivityAt
+                );
+                try
+                {
+                    await removed.DisposeAsync();
+                }
                 catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "Failed to dispose idle session {SessionId}", id);
@@ -160,15 +190,26 @@ public sealed class SessionManager : ISessionManager, IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        try { _disposeCts.Cancel(); } catch { }
-        try { await _sweeper; } catch { }
+        try
+        {
+            _disposeCts.Cancel();
+        }
+        catch { }
+        try
+        {
+            await _sweeper;
+        }
+        catch { }
 
         var sessions = _sessions.Values.ToList();
         _sessions.Clear();
 
         foreach (var session in sessions)
         {
-            try { await session.DisposeAsync(); }
+            try
+            {
+                await session.DisposeAsync();
+            }
             catch { }
         }
 

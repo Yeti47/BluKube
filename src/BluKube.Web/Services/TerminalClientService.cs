@@ -9,26 +9,33 @@ namespace BluKube.Web.Services;
 public sealed class TerminalClientService(
     IJSRuntime js,
     ClientSessionService session,
-    AudioStreamService audio) : IAsyncDisposable
+    AudioStreamService audio
+) : IClientViewService, IAsyncDisposable
 {
     private readonly XtermWriter _writer = new();
     private readonly XtermKeyInput _keyInput = new();
 
+    public ClientView View => ClientView.Terminal;
     public Task? ViewTask { get; private set; }
     public Task? PumpTask { get; private set; }
 
     public async Task StartAsync(DotNetObjectReference<Home> homeReference)
     {
         var dims = await js.InvokeAsync<TerminalDims>(
-            "xtermBridge.init", homeReference, "xterm-container");
+            "xtermBridge.init",
+            homeReference,
+            "xterm-container"
+        );
 
-        var console = AnsiConsole.Create(new AnsiConsoleSettings
-        {
-            Ansi = AnsiSupport.Yes,
-            ColorSystem = ColorSystemSupport.TrueColor,
-            Out = new AnsiConsoleOutput(_writer),
-            Interactive = InteractionSupport.No,
-        });
+        var console = AnsiConsole.Create(
+            new AnsiConsoleSettings
+            {
+                Ansi = AnsiSupport.Yes,
+                ColorSystem = ColorSystemSupport.TrueColor,
+                Out = new AnsiConsoleOutput(_writer),
+                Interactive = InteractionSupport.No,
+            }
+        );
         console.Profile.Width = dims.Cols;
         console.Profile.Height = dims.Rows;
 
@@ -44,15 +51,49 @@ public sealed class TerminalClientService(
     public void PostKey(string key, bool shift, bool ctrl, bool alt) =>
         _keyInput.Post(key, shift, ctrl, alt);
 
-    public void WriteError(string message) =>
-        _writer.WriteLine($"\x1b[31mError: {message}\x1b[0m");
+    public async Task ActivateAsync(DotNetObjectReference<Home>? homeReference)
+    {
+        if (homeReference is null)
+            return;
 
-    public void WriteWarning(string message) =>
-        _writer.WriteLine($"\x1b[33m{message}\x1b[0m");
+        try
+        {
+            await StartAsync(homeReference);
+        }
+        catch (Exception ex)
+        {
+            WriteError(ex.Message);
+        }
+    }
+
+    public async Task DeactivateAsync(bool resetSession = true)
+    {
+        await session.StopAsync(ViewTask, PumpTask, audio.PumpTask);
+        await DisposeXtermAsync();
+
+        ClearTasks();
+        audio.Clear();
+
+        if (resetSession)
+            session.ResetCancellation();
+    }
+
+    public void ClearState()
+    {
+        ClearTasks();
+    }
+
+    public void WriteError(string message) => _writer.WriteLine($"\x1b[31mError: {message}\x1b[0m");
+
+    public void WriteWarning(string message) => _writer.WriteLine($"\x1b[33m{message}\x1b[0m");
 
     public async Task DisposeXtermAsync()
     {
-        try { await js.InvokeVoidAsync("xtermBridge.dispose"); } catch { }
+        try
+        {
+            await js.InvokeVoidAsync("xtermBridge.dispose");
+        }
+        catch { }
     }
 
     public void ClearTasks()

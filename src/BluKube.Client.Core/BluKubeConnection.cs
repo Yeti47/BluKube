@@ -16,16 +16,20 @@ public sealed class BluKubeConnection(ConnectionSettings settings) : IAsyncDispo
 
     public async Task ConnectAsync(CancellationToken ct = default)
     {
-        if (_hub is not null) return;
+        if (_hub is not null)
+            return;
 
         var hub = new HubConnectionBuilder()
-            .WithUrl(settings.HubUrl, opts =>
-            {
-                if (!string.IsNullOrEmpty(settings.Token))
+            .WithUrl(
+                settings.HubUrl,
+                opts =>
                 {
-                    opts.AccessTokenProvider = () => Task.FromResult<string?>(settings.Token);
+                    if (!string.IsNullOrEmpty(settings.Token))
+                    {
+                        opts.AccessTokenProvider = () => Task.FromResult<string?>(settings.Token);
+                    }
                 }
-            })
+            )
             .WithAutomaticReconnect()
             .Build();
 
@@ -40,57 +44,67 @@ public sealed class BluKubeConnection(ConnectionSettings settings) : IAsyncDispo
         return _sessionId.Value;
     }
 
-    public Task CloseSessionAsync(Guid id, CancellationToken ct = default)
-        => Require().InvokeAsync("CloseSession", id, ct);
+    public Task CloseSessionAsync(Guid id, CancellationToken ct = default) =>
+        Require().InvokeAsync("CloseSession", id, ct);
 
     // --- Commands ------------------------------------------------------------
 
-    public Task<SessionState> SearchAsync(string query, int limit, CancellationToken ct = default)
-        => Require().InvokeAsync<SessionState>("Search", query, limit, ct);
+    public Task<SessionState> SearchAsync(
+        string query,
+        int limit,
+        CancellationToken ct = default
+    ) => Require().InvokeAsync<SessionState>("Search", query, limit, ct);
 
-    public Task<SessionState> PlayAsync(string videoId, CancellationToken ct = default)
-        => Require().InvokeAsync<SessionState>("Play", videoId, ct);
+    public Task<SessionState> PlayAsync(string videoId, CancellationToken ct = default) =>
+        Require().InvokeAsync<SessionState>("Play", videoId, ct);
 
-    public Task<SessionState> StopAsync(CancellationToken ct = default)
-        => Require().InvokeAsync<SessionState>("Stop", ct);
+    public Task<SessionState> StopAsync(CancellationToken ct = default) =>
+        Require().InvokeAsync<SessionState>("Stop", ct);
 
-    public Task<SessionState> PauseAsync(CancellationToken ct = default)
-        => Require().InvokeAsync<SessionState>("Pause", ct);
+    public Task<SessionState> PauseAsync(CancellationToken ct = default) =>
+        Require().InvokeAsync<SessionState>("Pause", ct);
 
-    public Task<SessionState> ResumeAsync(CancellationToken ct = default)
-        => Require().InvokeAsync<SessionState>("Resume", ct);
+    public Task<SessionState> ResumeAsync(CancellationToken ct = default) =>
+        Require().InvokeAsync<SessionState>("Resume", ct);
 
-    public Task<SessionState> SeekToAsync(TimeSpan position, CancellationToken ct = default)
-        => Require().InvokeAsync<SessionState>("SeekTo", position, ct);
+    public Task<SessionState> SeekToAsync(TimeSpan position, CancellationToken ct = default) =>
+        Require().InvokeAsync<SessionState>("SeekTo", position, ct);
 
-    public Task<SessionState> SetVolumeAsync(float volume, CancellationToken ct = default)
-        => Require().InvokeAsync<SessionState>("SetVolume", volume, ct);
+    public Task<SessionState> SetVolumeAsync(float volume, CancellationToken ct = default) =>
+        Require().InvokeAsync<SessionState>("SetVolume", volume, ct);
 
-    public Task<SessionState> GetStateAsync(CancellationToken ct = default)
-        => Require().InvokeAsync<SessionState>("GetState", ct);
+    public Task<SessionState> GetStateAsync(CancellationToken ct = default) =>
+        Require().InvokeAsync<SessionState>("GetState", ct);
 
     /// <summary>
     /// Server-streamed state updates for the attached session. Yields the
     /// current state immediately, then every subsequent update.
     /// </summary>
-    public IAsyncEnumerable<SessionState> StreamStatesAsync(CancellationToken ct = default)
-        => Require().StreamAsync<SessionState>("StreamStates", ct);
+    public IAsyncEnumerable<SessionState> StreamStatesAsync(CancellationToken ct = default) =>
+        Require().StreamAsync<SessionState>("StreamStates", ct);
 
     /// <summary>
     /// Server-streamed Opus audio packets for the attached session. Each
     /// element is one Opus packet; format is described by
     /// <see cref="AudioFormat"/>.
     /// </summary>
-    public IAsyncEnumerable<byte[]> StreamAudioAsync(CancellationToken ct = default)
-        => Require().StreamAsync<byte[]>("StreamAudio", ct);
+    public IAsyncEnumerable<byte[]> StreamAudioAsync(CancellationToken ct = default) =>
+        Require().StreamAsync<byte[]>("StreamAudio", ct);
 
-    private HubConnection Require()
-        => _hub ?? throw new InvalidOperationException("Not connected. Call ConnectAsync first.");
+    private HubConnection Require() =>
+        _hub ?? throw new InvalidOperationException("Not connected. Call ConnectAsync first.");
 
     public async ValueTask DisposeAsync()
     {
-        if (_hub is null) return;
-        try { await _hub.DisposeAsync(); }
-        finally { _hub = null; }
+        if (_hub is null)
+            return;
+        try
+        {
+            await _hub.DisposeAsync();
+        }
+        finally
+        {
+            _hub = null;
+        }
     }
 }

@@ -1,5 +1,5 @@
-using Microsoft.Playwright;
 using BluKube.Server.Core.Engine.Browser;
+using Microsoft.Playwright;
 
 namespace BluKube.Server.Core.Search;
 
@@ -18,8 +18,12 @@ internal sealed class YouTubeSearchPage : ISearchPage
 
     public async Task NavigateAsync(CancellationToken ct)
     {
-        var url = $"https://www.youtube.com/results?search_query={Uri.EscapeDataString(_query)}&hl=en&gl=US";
-        await _page.GotoAsync(url, new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = 30000 });
+        var url =
+            $"https://www.youtube.com/results?search_query={Uri.EscapeDataString(_query)}&hl=en&gl=US";
+        await _page.GotoAsync(
+            url,
+            new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = 30000 }
+        );
 
         var videoItems = _page.Locator("ytd-video-renderer");
         await videoItems.First.WaitForAsync(new LocatorWaitForOptions { Timeout = 30000 });
@@ -34,11 +38,13 @@ internal sealed class YouTubeSearchPage : ISearchPage
         while (!ct.IsCancellationRequested)
         {
             var count = await videoItems.CountAsync();
-            if (count >= _limit) break;
+            if (count >= _limit)
+                break;
 
             if (count == previousCount)
             {
-                if (++stallCount >= maxStalls) break;
+                if (++stallCount >= maxStalls)
+                    break;
             }
             else
             {
@@ -75,7 +81,8 @@ internal sealed class YouTubeSearchPage : ISearchPage
                     duration: durationEl?.textContent?.trim() ?? null
                   };
                 }
-                """);
+                """
+            );
 
             if (string.IsNullOrWhiteSpace(extracted?.Href))
             {
@@ -86,11 +93,14 @@ internal sealed class YouTubeSearchPage : ISearchPage
                 ? extracted.Href
                 : $"https://www.youtube.com{extracted.Href}";
 
-            results.Add(new MediaItem(
-                extracted.Title?.Trim() ?? "Unknown title",
-                extracted.Channel?.Trim() ?? "Unknown channel",
-                url,
-                ParseDuration(extracted.Duration)));
+            results.Add(
+                new MediaItem(
+                    extracted.Title?.Trim() ?? "Unknown title",
+                    extracted.Channel?.Trim() ?? "Unknown channel",
+                    url,
+                    ParseDuration(extracted.Duration)
+                )
+            );
         }
 
         return results;
@@ -98,20 +108,21 @@ internal sealed class YouTubeSearchPage : ISearchPage
 
     private static TimeSpan ParseDuration(string? raw)
     {
-        if (string.IsNullOrWhiteSpace(raw)) return TimeSpan.Zero;
+        if (string.IsNullOrWhiteSpace(raw))
+            return TimeSpan.Zero;
 
         var parts = raw.Trim().Split(':');
-        if (parts.Length == 3 &&
-            int.TryParse(parts[0], out var h) &&
-            int.TryParse(parts[1], out var m) &&
-            int.TryParse(parts[2], out var s))
+        if (
+            parts.Length == 3
+            && int.TryParse(parts[0], out var h)
+            && int.TryParse(parts[1], out var m)
+            && int.TryParse(parts[2], out var s)
+        )
         {
             return new TimeSpan(h, m, s);
         }
 
-        if (parts.Length == 2 &&
-            int.TryParse(parts[0], out m) &&
-            int.TryParse(parts[1], out s))
+        if (parts.Length == 2 && int.TryParse(parts[0], out m) && int.TryParse(parts[1], out s))
         {
             return new TimeSpan(0, m, s);
         }

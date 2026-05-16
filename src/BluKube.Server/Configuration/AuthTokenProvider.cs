@@ -9,7 +9,10 @@ namespace BluKube.Server.Configuration;
 /// if missing, generates and persists) the token at
 /// <see cref="AuthOptions.TokenFile"/>.
 /// </summary>
-public sealed class AuthTokenProvider(IOptions<AuthOptions> options, ILogger<AuthTokenProvider> logger)
+public sealed class AuthTokenProvider(
+    IOptions<AuthOptions> options,
+    ILogger<AuthTokenProvider> logger
+)
 {
     private readonly Lazy<string> _token = new(() => ResolveToken(options.Value, logger));
 
@@ -35,8 +38,11 @@ public sealed class AuthTokenProvider(IOptions<AuthOptions> options, ILogger<Aut
             }
         }
 
-        var generated = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
-            .Replace("+", "-").Replace("/", "_").TrimEnd('=');
+        var generated = Convert
+            .ToBase64String(RandomNumberGenerator.GetBytes(32))
+            .Replace("+", "-")
+            .Replace("/", "_")
+            .TrimEnd('=');
 
         try
         {
@@ -47,14 +53,19 @@ public sealed class AuthTokenProvider(IOptions<AuthOptions> options, ILogger<Aut
             }
             File.WriteAllText(file, generated);
             logger.LogWarning(
-                "No auth token configured. Generated and persisted a new one to {File}. " +
-                "Use BLUKUBE_TOKEN to pin an explicit value.", file);
+                "No auth token configured. Generated and persisted a new one to {File}. "
+                    + "Use BLUKUBE_TOKEN to pin an explicit value.",
+                file
+            );
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex,
-                "No auth token configured and {File} is not writable. " +
-                "Using an in-memory token (will rotate on restart).", file);
+            logger.LogWarning(
+                ex,
+                "No auth token configured and {File} is not writable. "
+                    + "Using an in-memory token (will rotate on restart).",
+                file
+            );
         }
 
         return generated;

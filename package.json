@@ -1,0 +1,11 @@
+{
+  "name": "blukube-formatting",
+  "private": true,
+  "scripts": {
+    "format": "dotnet tool restore && dotnet csharpier format . && prettier --write .",
+    "format:check": "dotnet tool restore && dotnet csharpier check . && prettier --check ."
+  },
+  "devDependencies": {
+    "prettier": "3.8.3"
+  }
+}

@@ -1,7 +1,7 @@
+using BluKube.Server.Core.Session;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
-using BluKube.Server.Core.Session;
 
 namespace BluKube.Server.Tests.Hubs;
 
@@ -57,8 +57,9 @@ public sealed class SessionHubTests : IClassFixture<HubFactory>, IAsyncLifetime
         var id = await hub.InvokeAsync<Guid>("CreateSession");
         await hub.InvokeAsync("CloseSession", id);
 
-        var ex = await Assert.ThrowsAsync<HubException>(
-            () => hub.InvokeAsync<SessionState>("GetState"));
+        var ex = await Assert.ThrowsAsync<HubException>(() =>
+            hub.InvokeAsync<SessionState>("GetState")
+        );
         Assert.Contains("No session", ex.Message);
     }
 
@@ -70,8 +71,9 @@ public sealed class SessionHubTests : IClassFixture<HubFactory>, IAsyncLifetime
         var second = await SessionAsync();
         var otherId = await second.InvokeAsync<Guid>("CreateSession");
 
-        var ex = await Assert.ThrowsAsync<HubException>(
-            () => first.InvokeAsync("CloseSession", otherId));
+        var ex = await Assert.ThrowsAsync<HubException>(() =>
+            first.InvokeAsync("CloseSession", otherId)
+        );
 
         Assert.Contains("not attached", ex.Message);
         Assert.IsType<IdleState>(await first.InvokeAsync<SessionState>("GetState"));
@@ -98,8 +100,9 @@ public sealed class SessionHubTests : IClassFixture<HubFactory>, IAsyncLifetime
     public async Task GetState_WithoutSession_ThrowsHubException()
     {
         var hub = await ConnectedAsync();
-        var ex = await Assert.ThrowsAsync<HubException>(
-            () => hub.InvokeAsync<SessionState>("GetState"));
+        var ex = await Assert.ThrowsAsync<HubException>(() =>
+            hub.InvokeAsync<SessionState>("GetState")
+        );
         Assert.Contains("No session", ex.Message);
     }
 
@@ -194,11 +197,14 @@ public sealed class SessionHubTests : IClassFixture<HubFactory>, IAsyncLifetime
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
         var received = new List<SessionState>();
-        var consuming = Task.Run(async () =>
-        {
-            await foreach (var s in hub.StreamAsync<SessionState>("StreamStates", cts.Token))
-                received.Add(s);
-        }, cts.Token);
+        var consuming = Task.Run(
+            async () =>
+            {
+                await foreach (var s in hub.StreamAsync<SessionState>("StreamStates", cts.Token))
+                    received.Add(s);
+            },
+            cts.Token
+        );
 
         // Issue a command that causes a state transition.
         await hub.InvokeAsync<SessionState>("Play", "abc123", CancellationToken.None);
@@ -223,7 +229,8 @@ public sealed class SessionHubTests : IClassFixture<HubFactory>, IAsyncLifetime
             await foreach (var pkt in hub.StreamAsync<byte[]>("StreamAudio", cts.Token))
             {
                 packets.Add(pkt);
-                if (packets.Count >= 3) break;
+                if (packets.Count >= 3)
+                    break;
             }
         }
         catch (OperationCanceledException) { }
@@ -236,7 +243,11 @@ public sealed class SessionHubTests : IClassFixture<HubFactory>, IAsyncLifetime
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private HubConnection Track(HubConnection hub) { _connections.Add(hub); return hub; }
+    private HubConnection Track(HubConnection hub)
+    {
+        _connections.Add(hub);
+        return hub;
+    }
 
     private async Task<HubConnection> ConnectedAsync()
     {
@@ -280,7 +291,10 @@ file static class TaskExtensions
     /// deliberately-cancelled task does not fail the test.</summary>
     internal static async Task IgnoreCancellation(this Task t)
     {
-        try { await t; }
+        try
+        {
+            await t;
+        }
         catch (OperationCanceledException) { }
     }
 }
