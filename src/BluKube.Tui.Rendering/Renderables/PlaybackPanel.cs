@@ -29,18 +29,18 @@ internal sealed class PlaybackPanel(
         var progressBar = new BreakdownChart()
             .Width(60)
             .HideTags()
-            .AddItem("done", percent * 100, Color.Green)
+            .AddItem("done", percent * 100, Color.Purple)
             .AddItem("left", (1 - percent) * 100, Color.Grey);
 
         var meta = new Grid().AddColumn().AddColumn()
-            .AddRow("[grey]title[/]", Markup.Escape(title ?? playback.VideoId))
-            .AddRow("[grey]channel[/]", Markup.Escape(channel ?? string.Empty))
-            .AddRow("[grey]video[/]", Markup.Escape(playback.VideoId))
-            .AddRow("[grey]state[/]", playback.IsPlaying ? "[green]playing[/]" : "[yellow]paused[/]")
-            .AddRow("[grey]time[/]", $"{ViewHelpers.FormatTime(playback.Position)} / {ViewHelpers.FormatTime(playback.Duration)}");
+            .AddRow(new Markup("[grey]title[/]"), new SanitizedText(title, fallback: playback.VideoId))
+            .AddRow(new Markup("[grey]channel[/]"), new SanitizedText(channel))
+            .AddRow(new Markup("[grey]video[/]"), new Markup(Markup.Escape(playback.VideoId)))
+            .AddRow(new Markup("[grey]state[/]"), new Markup(playback.IsPlaying ? "[purple]playing[/]" : "[yellow]paused[/]"))
+            .AddRow(new Markup("[grey]time[/]"), new TimeRangeLabel(playback.Position, playback.Duration));
 
         var volumeRow = new Grid().AddColumn().AddColumn()
-            .AddRow("[grey]volume[/]", $"{(int)Math.Round(playback.Volume * 100)}%");
+            .AddRow(new Markup("[grey]volume[/]"), new Markup($"{(int)Math.Round(playback.Volume * 100)}%"));
 
         var stack = new Grid().AddColumn();
         stack.AddRow(meta);
@@ -58,12 +58,12 @@ internal sealed class PlaybackPanel(
     private IRenderable BuildCompact(PlaybackState playback)
     {
         var stack = new Grid().AddColumn().AddColumn()
-            .AddRow("[grey]state[/]", playback.IsPlaying ? "[green]playing[/]" : "[yellow]paused[/]")
-            .AddRow("[grey]time[/]", $"{ViewHelpers.FormatTime(playback.Position)} / {ViewHelpers.FormatTime(playback.Duration)}")
-            .AddRow("[grey]volume[/]", $"{(int)Math.Round(playback.Volume * 100)}%");
+            .AddRow(new Markup("[grey]state[/]"), new Markup(playback.IsPlaying ? "[purple]playing[/]" : "[yellow]paused[/]"))
+            .AddRow(new Markup("[grey]time[/]"), new TimeRangeLabel(playback.Position, playback.Duration))
+            .AddRow(new Markup("[grey]volume[/]"), new Markup($"{(int)Math.Round(playback.Volume * 100)}%"));
 
         if (!string.IsNullOrWhiteSpace(error))
-            stack.AddRow("[grey]error[/]", $"[red]{Markup.Escape(error)}[/]");
+            stack.AddRow(new Markup("[grey]error[/]"), new Markup($"[red]{Markup.Escape(error)}[/]"));
 
         return new Panel(stack).Header("[bold]playback[/]");
     }

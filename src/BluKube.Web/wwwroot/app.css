@@ -9,7 +9,7 @@ html, body {
     --text: #c9d1d9;
     --muted: #8b949e;
     --blue: #58a6ff;
-    --green: #3fb950;
+    --purple: #a371f7;
     --amber: #d29922;
     --red: #f85149;
     margin: 0;
@@ -141,7 +141,7 @@ a {
 .setup button,
 .native-search-form button,
 .native-controls .primary-control {
-    background: #238636;
+    background: #8957e5;
     border: 1px solid transparent;
     color: #fff;
     padding: 0.62rem 1rem;
@@ -150,7 +150,7 @@ a {
 .setup button:hover:not(:disabled),
 .native-search-form button:hover:not(:disabled),
 .native-controls .primary-control:hover:not(:disabled) {
-    background: #2ea043;
+    background: #a371f7;
 }
 
 .setup-actions {
@@ -226,14 +226,22 @@ a {
     min-width: 0;
 }
 
+.ascii-logo {
+    font-family: var(--terminal-font);
+    font-variant-ligatures: none;
+    font-feature-settings: "liga" 0, "calt" 0;
+    letter-spacing: 0.1;
+    white-space: pre;
+    tab-size: 4;
+}
+
 .brand-cube {
     flex: 0 0 auto;
     margin: 0;
     color: var(--blue);
-    font-family: var(--terminal-font);
-    font-size: 0.62rem;
+    font-size: 0.42rem;
     font-weight: 700;
-    line-height: 0.78;
+    line-height: 1.05;
     text-shadow: 0 0 10px rgba(88, 166, 255, 0.34);
 }
 
@@ -439,8 +447,8 @@ a {
 }
 
 .now-line.is-playing .playback-indicator {
-    background: var(--green);
-    box-shadow: 0 0 0 3px rgba(63, 185, 80, 0.16);
+    background: var(--purple);
+    box-shadow: 0 0 0 3px rgba(163, 113, 247, 0.16);
     animation: playback-glow 1.25s ease-in-out infinite;
 }
 
@@ -459,11 +467,11 @@ a {
 }
 
 .native-player progress::-webkit-progress-value {
-    background: linear-gradient(90deg, rgba(88, 166, 255, 0.9), rgba(63, 185, 80, 0.95));
+    background: linear-gradient(90deg, rgba(88, 166, 255, 0.9), rgba(163, 113, 247, 0.95));
 }
 
 .native-player progress::-moz-progress-bar {
-    background: linear-gradient(90deg, rgba(88, 166, 255, 0.9), rgba(63, 185, 80, 0.95));
+    background: linear-gradient(90deg, rgba(88, 166, 255, 0.9), rgba(163, 113, 247, 0.95));
 }
 
 .time-row {
@@ -488,7 +496,7 @@ a {
 
 .native-controls .primary-control {
     border-color: transparent;
-    box-shadow: 0 0 0 1px rgba(63, 185, 80, 0.18);
+    box-shadow: 0 0 0 1px rgba(163, 113, 247, 0.18);
 }
 
 .native-controls .primary-control.is-paused {

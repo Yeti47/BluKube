@@ -58,7 +58,7 @@ internal sealed class ResultsViewController(BluKubeConnection connection) : IVie
                 await PlaySelectedAsync(state, redraw, ct);
                 break;
             default:
-                if (ViewHelpers.TryGetInputCharacter(key, out var character))
+                if (key.TryGetInputCharacter(out var character))
                 {
                     state.Mode = ViewMode.Search;
                     state.Query = character.ToString();
@@ -72,7 +72,7 @@ internal sealed class ResultsViewController(BluKubeConnection connection) : IVie
     private async Task PlaySelectedAsync(UiState state, Channel<bool> redraw, CancellationToken ct)
     {
         var item = state.Results[state.SelectedIndex];
-        var videoId = ViewHelpers.ExtractVideoId(item.Url);
+        var videoId = ExtractVideoId(item.Url);
 
         state.IsBusy = true;
         state.Error = null;
@@ -95,5 +95,25 @@ internal sealed class ResultsViewController(BluKubeConnection connection) : IVie
         state.Mode = ViewMode.Player;
         state.Status = null;
         await redraw.Writer.WriteAsync(true, ct);
+    }
+
+    private static string ExtractVideoId(string url)
+    {
+        if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
+        {
+            var query = uri.Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries);
+            foreach (var part in query)
+            {
+                var pair = part.Split('=', 2);
+                if (pair.Length == 2 && pair[0] == "v")
+                    return Uri.UnescapeDataString(pair[1]);
+            }
+
+            var segment = uri.Segments.LastOrDefault();
+            if (!string.IsNullOrEmpty(segment))
+                return segment.TrimEnd('/');
+        }
+
+        return url;
     }
 }

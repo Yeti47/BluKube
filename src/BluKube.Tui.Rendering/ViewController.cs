@@ -98,7 +98,7 @@ public sealed class ViewController(
                     break;
                 }
 
-                if (ViewHelpers.IsAltCharacter(key, 'x'))
+                if (key.IsAltCharacter('x'))
                 {
                     console.Clear();
                     await redraw.Writer.WriteAsync(true, ct);

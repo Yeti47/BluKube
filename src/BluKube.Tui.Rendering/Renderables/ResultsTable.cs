@@ -35,12 +35,12 @@ internal sealed class ResultsTable(
             {
                 var item = items[i];
                 table.AddRow(
-                    string.Empty,
+                    new Markup(string.Empty),
                     i == midRow
-                        ? "[bold white on blue] Loading... [/]"
-                        : $"[grey]{Markup.Escape(ViewHelpers.Truncate(item.Title, 60))}[/]",
-                    $"[grey]{Markup.Escape(item.Channel)}[/]",
-                    $"[grey]{ViewHelpers.FormatTime(item.Duration)}[/]");
+                        ? new Markup("[bold white on blue] Loading... [/]")
+                        : new SanitizedText(item.Title, maxLength: 60, style: SanitizedTextStyle.Dim),
+                    new SanitizedText(item.Channel, style: SanitizedTextStyle.Dim),
+                    new DurationLabel(item.Duration, dim: true));
             }
         }
         else
@@ -50,10 +50,15 @@ internal sealed class ResultsTable(
                 var item = items[i];
                 var selected = i == selectedIndex;
                 table.AddRow(
-                    selected ? "[blue]>[/]" : string.Empty,
-                    ViewHelpers.FormatCell(ViewHelpers.Truncate(item.Title, 60), selected),
-                    ViewHelpers.FormatCell(item.Channel, selected),
-                    ViewHelpers.FormatCell(ViewHelpers.FormatTime(item.Duration), selected));
+                    new Markup(selected ? "[blue]>[/]" : string.Empty),
+                    new SanitizedText(
+                        item.Title,
+                        maxLength: 60,
+                        style: selected ? SanitizedTextStyle.Selected : SanitizedTextStyle.Plain),
+                    new SanitizedText(
+                        item.Channel,
+                        style: selected ? SanitizedTextStyle.Selected : SanitizedTextStyle.Plain),
+                    new DurationLabel(item.Duration, selected));
             }
         }
 

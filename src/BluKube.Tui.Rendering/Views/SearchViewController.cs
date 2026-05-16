@@ -31,7 +31,7 @@ internal sealed class SearchViewController(BluKubeConnection connection, int lim
                 await redraw.Writer.WriteAsync(true, ct);
                 break;
             default:
-                if (ViewHelpers.TryGetInputCharacter(key, out var character))
+                if (key.TryGetInputCharacter(out var character))
                 {
                     state.Query += character;
                     state.Error = null;

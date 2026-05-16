@@ -1,0 +1,34 @@
+@using Microsoft.AspNetCore.Components
+
+<pre @attributes="AdditionalAttributes" class="@ClassText" aria-hidden="@AriaHiddenText">@Logo</pre>
+
+@code {
+    [Parameter]
+    public string Class { get; set; } = "ascii-logo";
+
+    [Parameter]
+    public bool AriaHidden { get; set; } = true;
+
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    private string AriaHiddenText => AriaHidden ? "true" : "false";
+
+    private string ClassText => string.IsNullOrWhiteSpace(Class)
+      ? "ascii-logo"
+      : $"ascii-logo {Class}";
+
+    private const string Logo = """
+          B l u K u b e B
+        # l           # l
+      #   u         #   u
+    B l u K u b e B     K
+    l     u       l     u
+    u     b       u     b
+    K     e       K     e
+    u     B l u K u b e B
+    b   #         b   #
+    e #           e #
+    B l u K u b e B
+    """;
+}

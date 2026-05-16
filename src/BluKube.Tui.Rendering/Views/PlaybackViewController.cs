@@ -11,7 +11,7 @@ internal sealed class PlaybackViewController(BluKubeConnection connection) : IVi
     
     public async Task DispatchAsync(KeyPress key, UiState state, Channel<bool> redraw, CancellationToken ct)
     {
-        if (ViewHelpers.IsAltCharacter(key, 'c'))
+        if (key.IsAltCharacter('c'))
         {
             state.CompactPlayback = !state.CompactPlayback;
             await redraw.Writer.WriteAsync(true, ct);
