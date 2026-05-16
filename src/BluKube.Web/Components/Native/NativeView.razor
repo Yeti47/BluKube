@@ -1,9 +1,43 @@
+@implements IDisposable
+@inject NativeClient Client
+
 <main class="native-client">
     <div class="native-terminal">
-        <NativeSearch />
+        <NativeSearch Query="@Client.Query"
+                      QueryChanged="Client.SetQuery"
+                      CanSearch="@Client.CanSearch"
+                      Error="@Client.Error"
+                      BusyMessage="@Client.BusyMessage"
+                      Search="Client.SearchAsync" />
 
-        <NativePlayer />
+        <NativePlayer Playback="@(Client.State as PlaybackState)"
+                      CurrentTitle="@Client.CurrentTitle"
+                      CurrentChannel="@Client.CurrentChannel"
+                      Busy="@Client.Busy"
+                      TogglePlayback="Client.TogglePlaybackAsync"
+                      Seek="Client.SeekAsync"
+                      SetVolume="Client.SetVolumeAsync"
+                      Stop="Client.StopAsync" />
 
-        <NativeResults />
+        <NativeResults Items="@Client.Results"
+                       Busy="@Client.Busy"
+                       Play="Client.PlayAsync" />
     </div>
 </main>
+
+@code {
+    protected override void OnInitialized()
+    {
+        Client.StateChanged += Refresh;
+    }
+
+    private void Refresh(object? sender, EventArgs args)
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        Client.StateChanged -= Refresh;
+    }
+}

@@ -1,12 +1,9 @@
-@implements IDisposable
-@inject NativeClient Client
-
-@if (Client.Results.Count > 0)
+@if (Items.Count > 0)
 {
     <section class="native-results" aria-label="Search results">
-        @foreach (var item in Client.Results)
+        @foreach (var item in Items)
         {
-            <button type="button" class="result-row" @onclick="() => Client.PlayAsync(item)" disabled="@Client.Busy">
+            <button type="button" class="result-row" @onclick="() => Play.InvokeAsync(item)" disabled="@Busy">
                 <span>
                     <strong>@item.Title</strong>
                     <small>@item.Channel</small>
@@ -25,19 +22,28 @@
 }
 
 @code {
-    protected override void OnInitialized()
-    {
-        Client.StateChanged += Client_StateChanged;
-    }
+    private bool _hasRendered;
+    private IReadOnlyList<MediaItem>? _lastRenderedItems;
+    private bool _lastRenderedBusy;
 
-    private void Client_StateChanged(object? sender, EventArgs args)
-    {
-        _ = InvokeAsync(StateHasChanged);
-    }
+    [Parameter] public IReadOnlyList<MediaItem> Items { get; set; } = [];
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public EventCallback<MediaItem> Play { get; set; }
 
-    public void Dispose()
+    protected override bool ShouldRender()
     {
-        Client.StateChanged -= Client_StateChanged;
+        var shouldRender = !_hasRendered
+            || !ReferenceEquals(Items, _lastRenderedItems)
+            || Busy != _lastRenderedBusy;
+
+        if (shouldRender)
+        {
+            _hasRendered = true;
+            _lastRenderedItems = Items;
+            _lastRenderedBusy = Busy;
+        }
+
+        return shouldRender;
     }
 
     private static bool IsLiveDuration(TimeSpan duration) => duration <= TimeSpan.Zero;

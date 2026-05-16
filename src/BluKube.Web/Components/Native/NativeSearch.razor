@@ -1,47 +1,57 @@
-@implements IDisposable
-@inject NativeClient Client
-
 <section class="native-search">
-    <form class="native-search-form" @onsubmit="Client.SearchAsync" @onsubmit:preventDefault>
-        <input type="search" placeholder="Search YouTube" value="@_query" @oninput="UpdateQuery" />
-        <button type="submit" disabled="@(!Client.CanSearch)">Search</button>
+    <form class="native-search-form" @onsubmit="Search" @onsubmit:preventDefault>
+        <input type="search" placeholder="Search YouTube" value="@Query" @oninput="UpdateQuery" />
+        <button type="submit" disabled="@(!CanSearch)">Search</button>
     </form>
     <div class="native-search-feedback">
-        @if (Client.Error is not null)
+        @if (Error is not null)
         {
-            <p class="error">@Client.Error</p>
+            <p class="error">@Error</p>
         }
-        else if (Client.BusyMessage is not null)
+        else if (BusyMessage is not null)
         {
             <div class="busy-row" role="status" aria-live="polite">
                 <span class="busy-bars" aria-hidden="true"><span></span><span></span><span></span></span>
-                <span>@Client.BusyMessage</span>
+                <span>@BusyMessage</span>
             </div>
         }
     </div>
 </section>
 
 @code {
-    private string _query = string.Empty;
+    private bool _hasRendered;
+    private string _lastRenderedQuery = string.Empty;
+    private bool _lastRenderedCanSearch;
+    private string? _lastRenderedError;
+    private string? _lastRenderedBusyMessage;
 
-    protected override void OnInitialized()
-    {
-        Client.StateChanged += Client_StateChanged;
-    }
+    [Parameter] public string Query { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> QueryChanged { get; set; }
+    [Parameter] public bool CanSearch { get; set; }
+    [Parameter] public string? Error { get; set; }
+    [Parameter] public string? BusyMessage { get; set; }
+    [Parameter] public EventCallback Search { get; set; }
 
-    private void UpdateQuery(ChangeEventArgs args)
-    {
-        _query = args.Value?.ToString() ?? string.Empty;
-        Client.SetQuery(_query);
-    }
+    private Task UpdateQuery(ChangeEventArgs args) =>
+        QueryChanged.InvokeAsync(args.Value?.ToString() ?? string.Empty);
 
-    private void Client_StateChanged(object? sender, EventArgs args)
+    protected override bool ShouldRender()
     {
-        _ = InvokeAsync(StateHasChanged);
-    }
+        var shouldRender = !_hasRendered
+            || Query != _lastRenderedQuery
+            || CanSearch != _lastRenderedCanSearch
+            || Error != _lastRenderedError
+            || BusyMessage != _lastRenderedBusyMessage;
 
-    public void Dispose()
-    {
-        Client.StateChanged -= Client_StateChanged;
+        if (shouldRender)
+        {
+            _hasRendered = true;
+            _lastRenderedQuery = Query;
+            _lastRenderedCanSearch = CanSearch;
+            _lastRenderedError = Error;
+            _lastRenderedBusyMessage = BusyMessage;
+        }
+
+        return shouldRender;
     }
 }

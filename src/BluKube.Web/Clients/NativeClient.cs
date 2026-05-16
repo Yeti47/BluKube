@@ -1,7 +1,6 @@
 using BluKube.Contracts;
 using BluKube.Web.Audio;
 using BluKube.Web.Clients.ErrorHandling;
-using Microsoft.AspNetCore.Components;
 
 namespace BluKube.Web.Clients;
 
@@ -16,6 +15,7 @@ public sealed class NativeClient(ClientSession session, AudioStream audio) : ICl
     public bool Busy { get; private set; }
     public string? BusyMessage { get; private set; }
     public string? Error { get; private set; }
+    public string Query => _query;
     public SessionState State { get; private set; } = new IdleState();
     public IReadOnlyList<MediaItem> Results { get; private set; } = [];
     public string? CurrentTitle { get; private set; }
@@ -79,7 +79,12 @@ public sealed class NativeClient(ClientSession session, AudioStream audio) : ICl
 
     public void SetQuery(string query)
     {
-        _query = query ?? string.Empty;
+        query ??= string.Empty;
+        if (query == _query)
+            return;
+
+        _query = query;
+        NotifyStateChanged();
     }
 
     public void SetError(string message)
@@ -150,9 +155,12 @@ public sealed class NativeClient(ClientSession session, AudioStream audio) : ICl
         if (connection is null || State is not PlaybackState playback)
             return;
 
-        await audio.ResumeAsync();
-        SetBusy(playback.IsPlaying ? "Pausing..." : "Resuming...");
-        NotifyStateChanged();
+        if (!playback.IsPlaying)
+        {
+            await audio.ResumeAsync();
+            SetBusy("Resuming...");
+            NotifyStateChanged();
+        }
 
         try
         {
@@ -184,9 +192,6 @@ public sealed class NativeClient(ClientSession session, AudioStream audio) : ICl
         if (playback.Duration > TimeSpan.Zero && next > playback.Duration)
             next = playback.Duration;
 
-        SetBusy("Seeking...");
-        NotifyStateChanged();
-
         try
         {
             ApplyState(await connection.SeekToAsync(next, session.Token));
@@ -202,12 +207,10 @@ public sealed class NativeClient(ClientSession session, AudioStream audio) : ICl
         }
     }
 
-    public async Task SetVolumeAsync(ChangeEventArgs args)
+    public async Task SetVolumeAsync(int percent)
     {
         var connection = session.Connection;
         if (connection is null)
-            return;
-        if (!int.TryParse(args.Value?.ToString(), out var percent))
             return;
 
         try
@@ -220,6 +223,10 @@ public sealed class NativeClient(ClientSession session, AudioStream audio) : ICl
         {
             Error = ex.Message;
         }
+        finally
+        {
+            NotifyStateChanged();
+        }
     }
 
     public async Task StopAsync()
@@ -227,9 +234,6 @@ public sealed class NativeClient(ClientSession session, AudioStream audio) : ICl
         var connection = session.Connection;
         if (connection is null)
             return;
-
-        SetBusy("Stopping...");
-        NotifyStateChanged();
 
         try
         {
