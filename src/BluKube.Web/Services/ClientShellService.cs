@@ -1,4 +1,3 @@
-using BluKube.Web.Components.Pages;
 using Microsoft.JSInterop;
 
 namespace BluKube.Web.Services;
@@ -76,17 +75,14 @@ public sealed class ClientShellService(
 
     public Task ShowTerminalAsync() => SwitchClientViewAsync(ClientView.Terminal);
 
-    public async Task StartPendingClientAsync(DotNetObjectReference<Home>? homeReference)
+    public async Task StartPendingClientAsync()
     {
         if (!_pendingClientInit)
             return;
 
         _pendingClientInit = false;
-        await CurrentClient.ActivateAsync(homeReference);
+        await CurrentClient.ActivateAsync();
     }
-
-    public void PostKey(string key, bool shift, bool ctrl, bool alt) =>
-        CurrentClient.PostKey(key, shift, ctrl, alt);
 
     public async Task StopAsync(bool resetSession = true)
     {

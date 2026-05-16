@@ -85,7 +85,7 @@ window.xtermBridge = (() => {
     /**
      * Initialise an xterm.js Terminal inside the given container element.
      *
-     * @param {DotNet.DotNetObject} dotNetRef - Blazor component reference
+      * @param {DotNet.DotNetObject} dotNetRef - .NET callback target
      *        that exposes [JSInvokable] OnXtermKey.
      * @param {string} containerId - id of the host <div>.
      * @returns {{ cols: number, rows: number }} terminal dimensions.
@@ -121,7 +121,7 @@ window.xtermBridge = (() => {
 
       document.fonts?.ready.then(() => _fitAddon?.fit());
 
-      // Forward key events to the Blazor component.
+      // Forward key events to the .NET terminal key dispatcher.
       // Also initialise/resume AudioContext here — onKey fires in a user-gesture context.
       _terminal.onKey(({ domEvent }) => {
         const key = domEvent.key?.toLowerCase();

@@ -32,8 +32,6 @@ else
 }
 
 @code {
-    private DotNetObjectReference<Home>? _ref;
-
     protected override void OnInitialized()
     {
         Client.StateChanged += Refresh;
@@ -43,17 +41,12 @@ else
     {
         if (firstRender)
         {
-            _ref = DotNetObjectReference.Create(this);
             await Client.InitializeAsync();
             return;
         }
 
-        await Client.StartPendingClientAsync(_ref);
+        await Client.StartPendingClientAsync();
     }
-
-    [JSInvokable]
-    public void OnXtermKey(string key, bool shift, bool ctrl, bool alt) =>
-        Client.PostKey(key, shift, ctrl, alt);
 
     private void Refresh(object? sender, EventArgs args)
     {
@@ -63,7 +56,6 @@ else
     public async ValueTask DisposeAsync()
     {
         Client.StateChanged -= Refresh;
-        _ref?.Dispose();
         await Client.StopAsync(resetSession: false);
     }
 }

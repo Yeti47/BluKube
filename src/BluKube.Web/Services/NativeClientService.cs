@@ -1,18 +1,17 @@
 using BluKube.Contracts;
-using BluKube.Web.Components.Pages;
 using Microsoft.AspNetCore.Components;
-using Microsoft.JSInterop;
 
 namespace BluKube.Web.Services;
 
 public sealed class NativeClientService(ClientSessionService session, AudioStreamService audio)
     : IClientViewService
 {
+    private string _query = string.Empty;
+
     public event EventHandler? StateChanged;
 
     public ClientView View => ClientView.Native;
     public Task? StateTask { get; private set; }
-    public string Query { get; set; } = string.Empty;
     public bool Busy { get; private set; }
     public string? BusyMessage { get; private set; }
     public string? Error { get; private set; }
@@ -20,6 +19,7 @@ public sealed class NativeClientService(ClientSessionService session, AudioStrea
     public IReadOnlyList<MediaItem> Results { get; private set; } = [];
     public string? CurrentTitle { get; private set; }
     public string? CurrentChannel { get; private set; }
+    public bool CanSearch => !Busy && !string.IsNullOrWhiteSpace(_query);
 
     public async Task StartAsync()
     {
@@ -45,7 +45,7 @@ public sealed class NativeClientService(ClientSessionService session, AudioStrea
 
     public void ClearTasks() => StateTask = null;
 
-    public async Task ActivateAsync(DotNetObjectReference<Home>? homeReference)
+    public async Task ActivateAsync()
     {
         try
         {
@@ -71,8 +71,13 @@ public sealed class NativeClientService(ClientSessionService session, AudioStrea
 
     public void ClearState()
     {
-        Query = string.Empty;
+        SetQuery(string.Empty);
         Reset();
+    }
+
+    public void SetQuery(string query)
+    {
+        _query = query ?? string.Empty;
     }
 
     public void SetError(string message)
@@ -81,12 +86,10 @@ public sealed class NativeClientService(ClientSessionService session, AudioStrea
         ClearBusy();
     }
 
-    public void PostKey(string key, bool shift, bool ctrl, bool alt) { }
-
     public async Task SearchAsync()
     {
         var connection = session.Connection;
-        if (connection is null || string.IsNullOrWhiteSpace(Query))
+        if (connection is null || string.IsNullOrWhiteSpace(_query))
             return;
 
         SetBusy("Searching...");
@@ -96,7 +99,7 @@ public sealed class NativeClientService(ClientSessionService session, AudioStrea
 
         try
         {
-            var state = await connection.SearchAsync(Query.Trim(), 10, session.Token);
+            var state = await connection.SearchAsync(_query.Trim(), 10, session.Token);
             ApplyState(state);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

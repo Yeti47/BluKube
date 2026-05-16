@@ -9,6 +9,7 @@ builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddScoped<IConfigStore, LocalStorageConfigStore>();
 builder.Services.AddScoped<ClientSessionService>();
 builder.Services.AddScoped<AudioStreamService>();
+builder.Services.AddScoped<TerminalKeyDispatcher>();
 builder.Services.AddScoped<TerminalClientService>();
 builder.Services.AddScoped<NativeClientService>();
 builder.Services.AddScoped<IClientViewService>(serviceProvider =>

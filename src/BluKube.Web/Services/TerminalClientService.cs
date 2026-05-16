@@ -1,5 +1,4 @@
 using BluKube.Tui.Rendering;
-using BluKube.Web.Components.Pages;
 using BluKube.Web.Xterm;
 using Microsoft.JSInterop;
 using Spectre.Console;
@@ -9,21 +8,26 @@ namespace BluKube.Web.Services;
 public sealed class TerminalClientService(
     IJSRuntime js,
     ClientSessionService session,
-    AudioStreamService audio
+    AudioStreamService audio,
+    TerminalKeyDispatcher keyDispatcher
 ) : IClientViewService, IAsyncDisposable
 {
     private readonly XtermWriter _writer = new();
     private readonly XtermKeyInput _keyInput = new();
+    private DotNetObjectReference<TerminalKeyDispatcher>? _keyDispatcherReference;
+    private bool _keyDispatcherAttached;
 
     public ClientView View => ClientView.Terminal;
     public Task? ViewTask { get; private set; }
     public Task? PumpTask { get; private set; }
 
-    public async Task StartAsync(DotNetObjectReference<Home> homeReference)
+    public async Task StartAsync()
     {
+        EnsureKeyDispatcherAttached();
+
         var dims = await js.InvokeAsync<TerminalDims>(
             "xtermBridge.init",
-            homeReference,
+            _keyDispatcherReference,
             "xterm-container"
         );
 
@@ -48,17 +52,14 @@ public sealed class TerminalClientService(
         ViewTask = controller.RunAsync(session.Token);
     }
 
-    public void PostKey(string key, bool shift, bool ctrl, bool alt) =>
-        _keyInput.Post(key, shift, ctrl, alt);
+    private void HandleKeyReceived(object? sender, TerminalKeyEventArgs args) =>
+        _keyInput.Post(args.Key, args.Shift, args.Ctrl, args.Alt);
 
-    public async Task ActivateAsync(DotNetObjectReference<Home>? homeReference)
+    public async Task ActivateAsync()
     {
-        if (homeReference is null)
-            return;
-
         try
         {
-            await StartAsync(homeReference);
+            await StartAsync();
         }
         catch (Exception ex)
         {
@@ -115,9 +116,23 @@ public sealed class TerminalClientService(
 
     public async ValueTask DisposeAsync()
     {
+        if (_keyDispatcherAttached)
+            keyDispatcher.KeyReceived -= HandleKeyReceived;
+
+        _keyDispatcherReference?.Dispose();
         _keyInput.Complete();
         _writer.Dispose();
         await DisposeXtermAsync();
+    }
+
+    private void EnsureKeyDispatcherAttached()
+    {
+        if (_keyDispatcherAttached)
+            return;
+
+        keyDispatcher.KeyReceived += HandleKeyReceived;
+        _keyDispatcherReference = DotNetObjectReference.Create(keyDispatcher);
+        _keyDispatcherAttached = true;
     }
 
     private sealed record TerminalDims(int Cols, int Rows);

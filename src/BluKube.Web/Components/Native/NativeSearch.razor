@@ -3,8 +3,8 @@
 
 <section class="native-search">
     <form class="native-search-form" @onsubmit="Client.SearchAsync" @onsubmit:preventDefault>
-        <input type="search" placeholder="Search YouTube" value="@Client.Query" @oninput="UpdateQuery" />
-        <button type="submit" disabled="@(Client.Busy || string.IsNullOrWhiteSpace(Client.Query))">Search</button>
+        <input type="search" placeholder="Search YouTube" value="@_query" @oninput="UpdateQuery" />
+        <button type="submit" disabled="@(!Client.CanSearch)">Search</button>
     </form>
     <div class="native-search-feedback">
         @if (Client.Error is not null)
@@ -22,13 +22,18 @@
 </section>
 
 @code {
+    private string _query = string.Empty;
+
     protected override void OnInitialized()
     {
         Client.StateChanged += Client_StateChanged;
     }
 
-    private void UpdateQuery(ChangeEventArgs args) =>
-        Client.Query = args.Value?.ToString() ?? string.Empty;
+    private void UpdateQuery(ChangeEventArgs args)
+    {
+        _query = args.Value?.ToString() ?? string.Empty;
+        Client.SetQuery(_query);
+    }
 
     private void Client_StateChanged(object? sender, EventArgs args)
     {
