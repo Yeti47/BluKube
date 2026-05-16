@@ -111,6 +111,7 @@ public sealed class NativeClient(ClientSession session, AudioStream audio) : ICl
         finally
         {
             ClearBusy();
+            NotifyStateChanged();
         }
     }
 
@@ -139,6 +140,7 @@ public sealed class NativeClient(ClientSession session, AudioStream audio) : ICl
         finally
         {
             ClearBusy();
+            NotifyStateChanged();
         }
     }
 
@@ -166,6 +168,7 @@ public sealed class NativeClient(ClientSession session, AudioStream audio) : ICl
         finally
         {
             ClearBusy();
+            NotifyStateChanged();
         }
     }
 
@@ -195,6 +198,7 @@ public sealed class NativeClient(ClientSession session, AudioStream audio) : ICl
         finally
         {
             ClearBusy();
+            NotifyStateChanged();
         }
     }
 
@@ -240,6 +244,7 @@ public sealed class NativeClient(ClientSession session, AudioStream audio) : ICl
         finally
         {
             ClearBusy();
+            NotifyStateChanged();
         }
     }
 
