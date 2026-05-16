@@ -85,7 +85,7 @@ window.xtermBridge = (() => {
     /**
      * Initialise an xterm.js Terminal inside the given container element.
      *
-      * @param {DotNet.DotNetObject} dotNetRef - .NET callback target
+     * @param {DotNet.DotNetObject} dotNetRef - .NET callback target
      *        that exposes [JSInvokable] OnXtermKey.
      * @param {string} containerId - id of the host <div>.
      * @returns {{ cols: number, rows: number }} terminal dimensions.

@@ -94,7 +94,10 @@ public abstract class ClientStartupException(string message, Exception innerExce
                 || text.Contains("actively refused", StringComparison.OrdinalIgnoreCase)
                 || text.Contains("no such host", StringComparison.OrdinalIgnoreCase)
                 || text.Contains("name or service not known", StringComparison.OrdinalIgnoreCase)
-                || text.Contains("nodename nor servname provided", StringComparison.OrdinalIgnoreCase)
+                || text.Contains(
+                    "nodename nor servname provided",
+                    StringComparison.OrdinalIgnoreCase
+                )
                 || text.Contains("network is unreachable", StringComparison.OrdinalIgnoreCase)
                 || text.Contains("timed out", StringComparison.OrdinalIgnoreCase)
             )

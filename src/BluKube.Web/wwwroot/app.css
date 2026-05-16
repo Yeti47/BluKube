@@ -748,9 +748,17 @@ a {
     min-width: 0;
   }
 
+  .download-link {
+    display: none;
+  }
+
   #xterm-container,
   .native-client {
     padding: 0.85rem;
+  }
+
+  .native-client {
+    margin-bottom: 4rem;
   }
 
   .native-search,

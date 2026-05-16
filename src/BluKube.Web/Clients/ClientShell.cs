@@ -1,5 +1,5 @@
-using Microsoft.JSInterop;
 using BluKube.Web.Clients.ErrorHandling;
+using Microsoft.JSInterop;
 
 namespace BluKube.Web.Clients;
 

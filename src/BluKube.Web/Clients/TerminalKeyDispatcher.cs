@@ -13,8 +13,7 @@ public sealed class TerminalKeyDispatcher
     }
 }
 
-public sealed class TerminalKeyEventArgs(string key, bool shift, bool ctrl, bool alt)
-    : EventArgs
+public sealed class TerminalKeyEventArgs(string key, bool shift, bool ctrl, bool alt) : EventArgs
 {
     public string Key { get; } = key;
     public bool Shift { get; } = shift;
