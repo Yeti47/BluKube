@@ -9,18 +9,19 @@ public sealed class NativeClient(ClientSession session, AudioStream audio) : ICl
 {
     private string _query = string.Empty;
 
-    public event EventHandler? StateChanged;
+    public event EventHandler<NativeClientChangedEventArgs>? StateChanged;
 
     public ClientView View => ClientView.Native;
     public Task? StateTask { get; private set; }
-    public bool Busy { get; private set; }
-    public string? BusyMessage { get; private set; }
+    public bool SearchBusy { get; private set; }
+    public string? SearchBusyMessage { get; private set; }
+    public bool PlaybackBusy { get; private set; }
     public string? Error { get; private set; }
     public SessionState State { get; private set; } = new IdleState();
     public IReadOnlyList<MediaItem> Results { get; private set; } = [];
     public string? CurrentTitle { get; private set; }
     public string? CurrentChannel { get; private set; }
-    public bool CanSearch => !Busy && !string.IsNullOrWhiteSpace(_query);
+    public bool CanSearch => !SearchBusy && !string.IsNullOrWhiteSpace(_query);
 
     public async Task StartAsync()
     {
@@ -30,7 +31,7 @@ public sealed class NativeClient(ClientSession session, AudioStream audio) : ICl
         audio.Start(message =>
         {
             Error = message;
-            NotifyStateChanged();
+            NotifyStateChanged(NativeClientSection.Search | NativeClientSection.Player);
         });
     }
 
@@ -39,7 +40,8 @@ public sealed class NativeClient(ClientSession session, AudioStream audio) : ICl
         State = new IdleState();
         Results = [];
         Error = null;
-        ClearBusy();
+        ClearSearchBusy();
+        ClearPlaybackBusy();
         CurrentTitle = null;
         CurrentChannel = null;
     }
@@ -56,7 +58,7 @@ public sealed class NativeClient(ClientSession session, AudioStream audio) : ICl
         catch (Exception ex)
         {
             SetError(ex.Message);
-            NotifyStateChanged();
+            NotifyStateChanged(NativeClientSection.Search | NativeClientSection.Player);
         }
     }
 
@@ -85,7 +87,8 @@ public sealed class NativeClient(ClientSession session, AudioStream audio) : ICl
     public void SetError(string message)
     {
         Error = message;
-        ClearBusy();
+        ClearSearchBusy();
+        ClearPlaybackBusy();
     }
 
     public async Task SearchAsync()
@@ -94,24 +97,26 @@ public sealed class NativeClient(ClientSession session, AudioStream audio) : ICl
         if (connection is null || string.IsNullOrWhiteSpace(_query))
             return;
 
-        SetBusy("Searching...");
+        SetSearchBusy("Searching...");
         Error = null;
         Results = [];
-        NotifyStateChanged();
+        NotifyStateChanged(NativeClientSection.Search | NativeClientSection.Results);
 
         try
         {
             var state = await connection.SearchAsync(_query.Trim(), 10, session.Token);
             ApplyState(state);
+            NotifyStateChanged(SectionsForState(state));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             Error = ex.Message;
+            NotifyStateChanged(NativeClientSection.Search);
         }
         finally
         {
-            ClearBusy();
-            NotifyStateChanged();
+            ClearSearchBusy();
+            NotifyStateChanged(NativeClientSection.Search);
         }
     }
 
@@ -122,25 +127,27 @@ public sealed class NativeClient(ClientSession session, AudioStream audio) : ICl
             return;
 
         await audio.ResumeAsync();
-        SetBusy("Loading track...");
+        SetPlaybackBusy();
         Error = null;
         CurrentTitle = item.Title;
         CurrentChannel = item.Channel;
-        NotifyStateChanged();
+        NotifyStateChanged(NativeClientSection.Player);
 
         try
         {
             var state = await connection.PlayAsync(ExtractVideoId(item.Url), session.Token);
             ApplyState(state);
+            NotifyStateChanged(SectionsForState(state));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             Error = ex.Message;
+            NotifyStateChanged(NativeClientSection.Search | NativeClientSection.Player);
         }
         finally
         {
-            ClearBusy();
-            NotifyStateChanged();
+            ClearPlaybackBusy();
+            NotifyStateChanged(NativeClientSection.Player);
         }
     }
 
@@ -151,8 +158,8 @@ public sealed class NativeClient(ClientSession session, AudioStream audio) : ICl
             return;
 
         await audio.ResumeAsync();
-        SetBusy(playback.IsPlaying ? "Pausing..." : "Resuming...");
-        NotifyStateChanged();
+        SetPlaybackBusy();
+        NotifyStateChanged(NativeClientSection.Player);
 
         try
         {
@@ -160,15 +167,17 @@ public sealed class NativeClient(ClientSession session, AudioStream audio) : ICl
                 ? await connection.PauseAsync(session.Token)
                 : await connection.ResumeAsync(session.Token);
             ApplyState(state);
+            NotifyStateChanged(SectionsForState(state));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             Error = ex.Message;
+            NotifyStateChanged(NativeClientSection.Search | NativeClientSection.Player);
         }
         finally
         {
-            ClearBusy();
-            NotifyStateChanged();
+            ClearPlaybackBusy();
+            NotifyStateChanged(NativeClientSection.Player);
         }
     }
 
@@ -184,21 +193,24 @@ public sealed class NativeClient(ClientSession session, AudioStream audio) : ICl
         if (playback.Duration > TimeSpan.Zero && next > playback.Duration)
             next = playback.Duration;
 
-        SetBusy("Seeking...");
-        NotifyStateChanged();
+        SetPlaybackBusy();
+        NotifyStateChanged(NativeClientSection.Player);
 
         try
         {
-            ApplyState(await connection.SeekToAsync(next, session.Token));
+            var state = await connection.SeekToAsync(next, session.Token);
+            ApplyState(state);
+            NotifyStateChanged(SectionsForState(state));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             Error = ex.Message;
+            NotifyStateChanged(NativeClientSection.Search | NativeClientSection.Player);
         }
         finally
         {
-            ClearBusy();
-            NotifyStateChanged();
+            ClearPlaybackBusy();
+            NotifyStateChanged(NativeClientSection.Player);
         }
     }
 
@@ -228,23 +240,26 @@ public sealed class NativeClient(ClientSession session, AudioStream audio) : ICl
         if (connection is null)
             return;
 
-        SetBusy("Stopping...");
-        NotifyStateChanged();
+        SetPlaybackBusy();
+        NotifyStateChanged(NativeClientSection.Player);
 
         try
         {
-            ApplyState(await connection.StopAsync(session.Token));
+            var state = await connection.StopAsync(session.Token);
+            ApplyState(state);
             CurrentTitle = null;
             CurrentChannel = null;
+            NotifyStateChanged(SectionsForState(state));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             Error = ex.Message;
+            NotifyStateChanged(NativeClientSection.Search | NativeClientSection.Player);
         }
         finally
         {
-            ClearBusy();
-            NotifyStateChanged();
+            ClearPlaybackBusy();
+            NotifyStateChanged(NativeClientSection.Player);
         }
     }
 
@@ -259,7 +274,7 @@ public sealed class NativeClient(ClientSession session, AudioStream audio) : ICl
             await foreach (var state in connection.StreamStatesAsync(session.Token))
             {
                 ApplyState(state);
-                NotifyStateChanged();
+                NotifyStateChanged(SectionsForState(state));
             }
         }
         catch (OperationCanceledException) { }
@@ -286,23 +301,43 @@ public sealed class NativeClient(ClientSession session, AudioStream audio) : ICl
         }
     }
 
-    private void SetBusy(string message)
+    private void SetSearchBusy(string message)
     {
-        Busy = true;
-        BusyMessage = message;
+        SearchBusy = true;
+        SearchBusyMessage = message;
     }
 
-    private void ClearBusy()
+    private void ClearSearchBusy()
     {
-        Busy = false;
-        BusyMessage = null;
+        SearchBusy = false;
+        SearchBusyMessage = null;
     }
 
-    private void NotifyStateChanged()
+    private void SetPlaybackBusy()
+    {
+        PlaybackBusy = true;
+    }
+
+    private void ClearPlaybackBusy()
+    {
+        PlaybackBusy = false;
+    }
+
+    private void NotifyStateChanged(NativeClientSection sections)
     {
         var handler = StateChanged;
-        handler?.Invoke(this, EventArgs.Empty);
+        handler?.Invoke(this, new NativeClientChangedEventArgs(sections));
     }
+
+    private static NativeClientSection SectionsForState(SessionState state) =>
+        state switch
+        {
+            SearchResultsState => NativeClientSection.Search | NativeClientSection.Results,
+            PlaybackState => NativeClientSection.Player,
+            IdleState => NativeClientSection.Player,
+            ErrorState => NativeClientSection.Search | NativeClientSection.Player | NativeClientSection.Results,
+            _ => NativeClientSection.Player
+        };
 
     private static string ExtractVideoId(string url)
     {
@@ -323,4 +358,20 @@ public sealed class NativeClient(ClientSession session, AudioStream audio) : ICl
 
         return url;
     }
+}
+
+[Flags]
+public enum NativeClientSection
+{
+    None = 0,
+    Search = 1,
+    Results = 2,
+    Player = 4,
+}
+
+public sealed class NativeClientChangedEventArgs(NativeClientSection sections) : EventArgs
+{
+    public NativeClientSection Sections { get; } = sections;
+
+    public bool Includes(NativeClientSection sections) => (Sections & sections) != 0;
 }

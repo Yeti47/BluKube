@@ -11,11 +11,11 @@
         {
             <p class="error">@Client.Error</p>
         }
-        else if (Client.BusyMessage is not null)
+        else if (Client.SearchBusyMessage is not null)
         {
             <div class="busy-row" role="status" aria-live="polite">
                 <span class="busy-bars" aria-hidden="true"><span></span><span></span><span></span></span>
-                <span>@Client.BusyMessage</span>
+                <span>@Client.SearchBusyMessage</span>
             </div>
         }
     </div>
@@ -35,8 +35,11 @@
         Client.SetQuery(_query);
     }
 
-    private void Client_StateChanged(object? sender, EventArgs args)
+    private void Client_StateChanged(object? sender, NativeClientChangedEventArgs args)
     {
+        if (!args.Includes(NativeClientSection.Search))
+            return;
+
         _ = InvokeAsync(StateHasChanged);
     }
 

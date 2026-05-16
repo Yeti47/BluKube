@@ -6,7 +6,7 @@
     <section class="native-results" aria-label="Search results">
         @foreach (var item in Client.Results)
         {
-            <button type="button" class="result-row" @onclick="() => Client.PlayAsync(item)" disabled="@Client.Busy">
+            <button type="button" class="result-row" @onclick="() => Client.PlayAsync(item)">
                 <span>
                     <strong>@item.Title</strong>
                     <small>@item.Channel</small>
@@ -30,8 +30,11 @@
         Client.StateChanged += Client_StateChanged;
     }
 
-    private void Client_StateChanged(object? sender, EventArgs args)
+    private void Client_StateChanged(object? sender, NativeClientChangedEventArgs args)
     {
+        if (!args.Includes(NativeClientSection.Results))
+            return;
+
         _ = InvokeAsync(StateHasChanged);
     }
 

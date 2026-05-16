@@ -20,16 +20,16 @@
             <span>@FormatTime(playback.Duration)</span>
         </div>
         <div class="native-controls">
-            <button type="button" class="seek-control" aria-label="Rewind 30 seconds" title="Rewind 30 seconds" @onclick="() => Client.SeekAsync(TimeSpan.FromSeconds(-30))" disabled="@Client.Busy">&lt;&lt; 30</button>
-            <button type="button" class="seek-control" aria-label="Rewind 10 seconds" title="Rewind 10 seconds" @onclick="() => Client.SeekAsync(TimeSpan.FromSeconds(-10))" disabled="@Client.Busy">&lt; 10</button>
-            <button class="primary-control @(playback.IsPlaying ? "is-playing" : "is-paused")" type="button" @onclick="Client.TogglePlaybackAsync" disabled="@Client.Busy">@(playback.IsPlaying ? "Pause" : "Play")</button>
-            <button type="button" class="seek-control" aria-label="Fast-forward 10 seconds" title="Fast-forward 10 seconds" @onclick="() => Client.SeekAsync(TimeSpan.FromSeconds(10))" disabled="@Client.Busy">10 &gt;</button>
-            <button type="button" class="seek-control" aria-label="Fast-forward 30 seconds" title="Fast-forward 30 seconds" @onclick="() => Client.SeekAsync(TimeSpan.FromSeconds(30))" disabled="@Client.Busy">30 &gt;&gt;</button>
-            <button type="button" @onclick="Client.StopAsync" disabled="@Client.Busy">Stop</button>
+            <button type="button" class="seek-control" aria-label="Rewind 30 seconds" title="Rewind 30 seconds" @onclick="() => Client.SeekAsync(TimeSpan.FromSeconds(-30))" disabled="@Client.PlaybackBusy">&lt;&lt; 30</button>
+            <button type="button" class="seek-control" aria-label="Rewind 10 seconds" title="Rewind 10 seconds" @onclick="() => Client.SeekAsync(TimeSpan.FromSeconds(-10))" disabled="@Client.PlaybackBusy">&lt; 10</button>
+            <button class="primary-control @(playback.IsPlaying ? "is-playing" : "is-paused")" type="button" @onclick="Client.TogglePlaybackAsync" disabled="@Client.PlaybackBusy">@(playback.IsPlaying ? "Pause" : "Play")</button>
+            <button type="button" class="seek-control" aria-label="Fast-forward 10 seconds" title="Fast-forward 10 seconds" @onclick="() => Client.SeekAsync(TimeSpan.FromSeconds(10))" disabled="@Client.PlaybackBusy">10 &gt;</button>
+            <button type="button" class="seek-control" aria-label="Fast-forward 30 seconds" title="Fast-forward 30 seconds" @onclick="() => Client.SeekAsync(TimeSpan.FromSeconds(30))" disabled="@Client.PlaybackBusy">30 &gt;&gt;</button>
+            <button type="button" @onclick="Client.StopAsync" disabled="@Client.PlaybackBusy">Stop</button>
         </div>
         <label class="volume-control">
             <span>Volume</span>
-            <input type="range" min="0" max="100" value="@VolumePercent(playback)" @oninput="Client.SetVolumeAsync" disabled="@Client.Busy" />
+            <input type="range" min="0" max="100" value="@VolumePercent(playback)" @oninput="Client.SetVolumeAsync" disabled="@Client.PlaybackBusy" />
             <span>@VolumePercent(playback)%</span>
         </label>
     }
@@ -47,8 +47,11 @@
         Client.StateChanged += Client_StateChanged;
     }
 
-    private void Client_StateChanged(object? sender, EventArgs args)
+    private void Client_StateChanged(object? sender, NativeClientChangedEventArgs args)
     {
+        if (!args.Includes(NativeClientSection.Player))
+            return;
+
         _ = InvokeAsync(StateHasChanged);
     }
 
