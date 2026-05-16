@@ -1,31 +1,26 @@
 <section class="native-search">
-    <form class="native-search-form" @onsubmit="OnSearch" @onsubmit:preventDefault>
-        <input type="search" placeholder="Search YouTube" value="@Query" @oninput="UpdateQuery" />
-        <button type="submit" disabled="@(Busy || string.IsNullOrWhiteSpace(Query))">Search</button>
+    <form class="native-search-form" @onsubmit="Client.SearchAsync" @onsubmit:preventDefault>
+        <input type="search" placeholder="Search YouTube" value="@Client.Query" @oninput="UpdateQuery" />
+        <button type="submit" disabled="@(Client.Busy || string.IsNullOrWhiteSpace(Client.Query))">Search</button>
     </form>
     <div class="native-search-feedback">
-        @if (Error is not null)
+        @if (Client.Error is not null)
         {
-            <p class="error">@Error</p>
+            <p class="error">@Client.Error</p>
         }
-        else if (BusyMessage is not null)
+        else if (Client.BusyMessage is not null)
         {
             <div class="busy-row" role="status" aria-live="polite">
                 <span class="busy-bars" aria-hidden="true"><span></span><span></span><span></span></span>
-                <span>@BusyMessage</span>
+                <span>@Client.BusyMessage</span>
             </div>
         }
     </div>
 </section>
 
 @code {
-    [Parameter] public string Query { get; set; } = string.Empty;
-    [Parameter] public EventCallback<string> QueryChanged { get; set; }
-    [Parameter] public bool Busy { get; set; }
-    [Parameter] public string? BusyMessage { get; set; }
-    [Parameter] public string? Error { get; set; }
-    [Parameter] public EventCallback OnSearch { get; set; }
+    [Parameter, EditorRequired] public NativeClientService Client { get; set; } = default!;
 
-    private Task UpdateQuery(ChangeEventArgs args) =>
-        QueryChanged.InvokeAsync(args.Value?.ToString() ?? string.Empty);
+    private void UpdateQuery(ChangeEventArgs args) =>
+        Client.Query = args.Value?.ToString() ?? string.Empty;
 }

@@ -1,13 +1,13 @@
 <section class="native-player">
-    @if (State is PlaybackState playback)
+    @if (Client.State is PlaybackState playback)
     {
         <div class="now-line @(playback.IsPlaying ? "is-playing" : "is-paused")">
             <span class="playback-indicator" aria-hidden="true"></span>
             <span class="track-copy">
-                <strong>@(CurrentTitle ?? playback.VideoId)</strong>
-                @if (!string.IsNullOrWhiteSpace(CurrentChannel))
+                <strong>@(Client.CurrentTitle ?? playback.VideoId)</strong>
+                @if (!string.IsNullOrWhiteSpace(Client.CurrentChannel))
                 {
-                    <small>@CurrentChannel</small>
+                    <small>@Client.CurrentChannel</small>
                 }
             </span>
         </div>
@@ -17,16 +17,16 @@
             <span>@FormatTime(playback.Duration)</span>
         </div>
         <div class="native-controls">
-            <button type="button" class="seek-control" aria-label="Rewind 30 seconds" title="Rewind 30 seconds" @onclick="() => OnSeek.InvokeAsync(TimeSpan.FromSeconds(-30))" disabled="@Busy">&lt;&lt; 30</button>
-            <button type="button" class="seek-control" aria-label="Rewind 10 seconds" title="Rewind 10 seconds" @onclick="() => OnSeek.InvokeAsync(TimeSpan.FromSeconds(-10))" disabled="@Busy">&lt; 10</button>
-            <button class="primary-control @(playback.IsPlaying ? "is-playing" : "is-paused")" type="button" @onclick="OnTogglePlayback" disabled="@Busy">@(playback.IsPlaying ? "Pause" : "Play")</button>
-            <button type="button" class="seek-control" aria-label="Fast-forward 10 seconds" title="Fast-forward 10 seconds" @onclick="() => OnSeek.InvokeAsync(TimeSpan.FromSeconds(10))" disabled="@Busy">10 &gt;</button>
-            <button type="button" class="seek-control" aria-label="Fast-forward 30 seconds" title="Fast-forward 30 seconds" @onclick="() => OnSeek.InvokeAsync(TimeSpan.FromSeconds(30))" disabled="@Busy">30 &gt;&gt;</button>
-            <button type="button" @onclick="OnStop" disabled="@Busy">Stop</button>
+            <button type="button" class="seek-control" aria-label="Rewind 30 seconds" title="Rewind 30 seconds" @onclick="() => Client.SeekAsync(TimeSpan.FromSeconds(-30))" disabled="@Client.Busy">&lt;&lt; 30</button>
+            <button type="button" class="seek-control" aria-label="Rewind 10 seconds" title="Rewind 10 seconds" @onclick="() => Client.SeekAsync(TimeSpan.FromSeconds(-10))" disabled="@Client.Busy">&lt; 10</button>
+            <button class="primary-control @(playback.IsPlaying ? "is-playing" : "is-paused")" type="button" @onclick="Client.TogglePlaybackAsync" disabled="@Client.Busy">@(playback.IsPlaying ? "Pause" : "Play")</button>
+            <button type="button" class="seek-control" aria-label="Fast-forward 10 seconds" title="Fast-forward 10 seconds" @onclick="() => Client.SeekAsync(TimeSpan.FromSeconds(10))" disabled="@Client.Busy">10 &gt;</button>
+            <button type="button" class="seek-control" aria-label="Fast-forward 30 seconds" title="Fast-forward 30 seconds" @onclick="() => Client.SeekAsync(TimeSpan.FromSeconds(30))" disabled="@Client.Busy">30 &gt;&gt;</button>
+            <button type="button" @onclick="Client.StopAsync" disabled="@Client.Busy">Stop</button>
         </div>
         <label class="volume-control">
             <span>Volume</span>
-            <input type="range" min="0" max="100" value="@VolumePercent(playback)" @oninput="OnVolumeChange" disabled="@Busy" />
+            <input type="range" min="0" max="100" value="@VolumePercent(playback)" @oninput="Client.SetVolumeAsync" disabled="@Client.Busy" />
             <span>@VolumePercent(playback)%</span>
         </label>
     }
@@ -39,14 +39,7 @@
 </section>
 
 @code {
-    [Parameter, EditorRequired] public SessionState State { get; set; } = new IdleState();
-    [Parameter] public bool Busy { get; set; }
-    [Parameter] public string? CurrentTitle { get; set; }
-    [Parameter] public string? CurrentChannel { get; set; }
-    [Parameter] public EventCallback OnTogglePlayback { get; set; }
-    [Parameter] public EventCallback<TimeSpan> OnSeek { get; set; }
-    [Parameter] public EventCallback<ChangeEventArgs> OnVolumeChange { get; set; }
-    [Parameter] public EventCallback OnStop { get; set; }
+    [Parameter, EditorRequired] public NativeClientService Client { get; set; } = default!;
 
     private static int ProgressValue(PlaybackState playback) =>
         playback.Duration.TotalSeconds > 0

@@ -1,9 +1,9 @@
-@if (Results.Count > 0)
+@if (Client.Results.Count > 0)
 {
     <section class="native-results" aria-label="Search results">
-        @foreach (var item in Results)
+        @foreach (var item in Client.Results)
         {
-            <button type="button" class="result-row" @onclick="() => OnPlay.InvokeAsync(item)" disabled="@Busy">
+            <button type="button" class="result-row" @onclick="() => Client.PlayAsync(item)" disabled="@Client.Busy">
                 <span>
                     <strong>@item.Title</strong>
                     <small>@item.Channel</small>
@@ -22,9 +22,7 @@
 }
 
 @code {
-    [Parameter] public IReadOnlyList<MediaItem> Results { get; set; } = [];
-    [Parameter] public bool Busy { get; set; }
-    [Parameter] public EventCallback<MediaItem> OnPlay { get; set; }
+    [Parameter, EditorRequired] public NativeClientService Client { get; set; } = default!;
 
     private static bool IsLiveDuration(TimeSpan duration) => duration <= TimeSpan.Zero;
 

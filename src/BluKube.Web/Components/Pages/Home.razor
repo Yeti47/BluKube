@@ -2,9 +2,11 @@
 @rendermode InteractiveServer
 @implements IAsyncDisposable
 @inject IJSRuntime JS
-@inject IConfigStore ConfigStore
-@using Concentus
-@using Spectre.Console
+@inject ClientSessionService Session
+@inject AudioStreamService Audio
+@inject TerminalClientService Terminal
+@inject NativeClientService Native
+
 @using BluKube.Web.Components.Native
 @using BluKube.Web.Components.Terminal
 
@@ -34,20 +36,7 @@ else
         }
         else
         {
-            <NativeClient @bind-Query="_nativeQuery"
-                          Busy="_nativeBusy"
-                          BusyMessage="@_nativeBusyMessage"
-                          Error="@_nativeError"
-                          State="_nativeState"
-                          Results="_nativeResults"
-                          CurrentTitle="@_nativeCurrentTitle"
-                          CurrentChannel="@_nativeCurrentChannel"
-                          OnSearch="SearchNativeAsync"
-                          OnPlay="PlayNativeAsync"
-                          OnTogglePlayback="ToggleNativePlaybackAsync"
-                          OnSeek="SeekNativeAsync"
-                          OnVolumeChange="SetNativeVolumeAsync"
-                          OnStop="StopNativeAsync" />
+            <NativeClient Client="Native" />
         }
     </div>
 }
@@ -64,25 +53,7 @@ else
     private bool _pendingTerminalInit;
     private bool _pendingNativeInit;
 
-    private readonly XtermWriter _writer = new();
-    private readonly XtermKeyInput _keyInput = new();
-
     private DotNetObjectReference<Home>? _ref;
-    private CancellationTokenSource _cts = new();
-    private Task? _viewTask;
-    private Task? _pumpTask;
-    private Task? _audioTask;
-    private Task? _nativeStateTask;
-    private BluKubeConnection? _connection;
-
-    private string _nativeQuery = string.Empty;
-    private bool _nativeBusy;
-    private string? _nativeBusyMessage;
-    private string? _nativeError;
-    private SessionState _nativeState = new IdleState();
-    private IReadOnlyList<MediaItem> _nativeResults = [];
-    private string? _nativeCurrentTitle;
-    private string? _nativeCurrentChannel;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -90,8 +61,7 @@ else
         {
             _ref = DotNetObjectReference.Create(this);
 
-            var settings = await ConfigStore.LoadAsync(_cts.Token);
-            if (settings is null)
+            if (!await Session.HasSavedSettingsAsync())
             {
                 _appState = AppState.Login;
             }
@@ -115,7 +85,7 @@ else
             }
             catch (Exception ex)
             {
-                _writer.WriteLine($"\x1b[31mError: {ex.Message}\x1b[0m");
+                Terminal.WriteError(ex.Message);
             }
         }
 
@@ -128,8 +98,7 @@ else
             }
             catch (Exception ex)
             {
-                _nativeError = ex.Message;
-                ClearNativeBusy();
+                Native.SetError(ex.Message);
                 await InvokeAsync(StateHasChanged);
             }
         }
@@ -149,14 +118,11 @@ else
 
     private async Task ClearConfigAsync()
     {
-        await ConfigStore.ClearAsync(CancellationToken.None);
+        await Session.ClearSettingsAsync();
         await StopClientAsync();
 
-        _cts.Dispose();
-        _cts = new CancellationTokenSource();
-
-        _nativeQuery = string.Empty;
-        ResetNativeState();
+        Native.Query = string.Empty;
+        Native.Reset();
         _pendingTerminalInit = false;
         _pendingNativeInit = false;
         _appState = AppState.Login;
@@ -167,11 +133,9 @@ else
         if (_clientView == view) return;
 
         await StopClientAsync();
-        _cts.Dispose();
-        _cts = new CancellationTokenSource();
 
         _clientView = view;
-        ResetNativeState();
+        Native.Reset();
         QueueClientInit();
     }
 
@@ -195,398 +159,38 @@ else
         }
     }
 
-    private async Task<BluKubeConnection> ConnectSessionAsync()
-    {
-        var settings = await ConfigStore.LoadAsync(_cts.Token)
-            ?? throw new InvalidOperationException("No connection settings found.");
-
-        var connection = new BluKubeConnection(settings);
-        await connection.ConnectAsync(_cts.Token);
-        _ = await connection.CreateSessionAsync(_cts.Token);
-        _connection = connection;
-        return connection;
-    }
-
     private async Task InitTerminalAsync()
     {
-        var dims = await JS.InvokeAsync<TerminalDims>(
-            "xtermBridge.init", _ref, "xterm-container");
+        if (_ref is null) return;
 
-        var console = AnsiConsole.Create(new AnsiConsoleSettings
-        {
-            Ansi = AnsiSupport.Yes,
-            ColorSystem = ColorSystemSupport.TrueColor,
-            Out = new AnsiConsoleOutput(_writer),
-            Interactive = InteractionSupport.No,
-        });
-        console.Profile.Width = dims.Cols;
-        console.Profile.Height = dims.Rows;
-
-        _pumpTask = PumpOutputAsync();
-
-        var connection = await ConnectSessionAsync();
-        _audioTask = PumpAudioAsync();
-
-        var vc = new ViewController(console, _keyInput, connection, enableQuitKeys: false);
-        _viewTask = vc.RunAsync(_cts.Token);
+        await Terminal.StartAsync(_ref);
     }
 
     private async Task InitNativeAsync()
     {
-        ClearNativeBusy();
-        _nativeError = null;
-        ResetNativeState();
-
-        await ConnectSessionAsync();
-        _nativeStateTask = PumpNativeStatesAsync();
-        _audioTask = PumpAudioAsync();
+        await Native.StartAsync();
     }
 
     [JSInvokable]
     public void OnXtermKey(string key, bool shift, bool ctrl, bool alt) =>
-        _keyInput.Post(key, shift, ctrl, alt);
+        Terminal.PostKey(key, shift, ctrl, alt);
 
-    private async Task SearchNativeAsync()
+    private async Task StopClientAsync(bool resetSession = true)
     {
-        if (_connection is null || string.IsNullOrWhiteSpace(_nativeQuery)) return;
+        await Session.StopAsync(Terminal.ViewTask, Terminal.PumpTask, Audio.PumpTask, Native.StateTask);
+        await Terminal.DisposeXtermAsync();
 
-        SetNativeBusy("Searching...");
-        _nativeError = null;
-        _nativeResults = [];
-        await InvokeAsync(StateHasChanged);
+        Terminal.ClearTasks();
+        Native.ClearTasks();
+        Audio.Clear();
 
-        try
-        {
-            var state = await _connection.SearchAsync(_nativeQuery.Trim(), 10, _cts.Token);
-            ApplyNativeState(state);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            _nativeError = ex.Message;
-        }
-        finally
-        {
-            ClearNativeBusy();
-        }
-    }
-
-    private async Task PlayNativeAsync(MediaItem item)
-    {
-        if (_connection is null) return;
-
-        await ResumeAudioAsync();
-        SetNativeBusy("Loading track...");
-        _nativeError = null;
-        _nativeCurrentTitle = item.Title;
-        _nativeCurrentChannel = item.Channel;
-        await InvokeAsync(StateHasChanged);
-
-        try
-        {
-            var state = await _connection.PlayAsync(ExtractVideoId(item.Url), _cts.Token);
-            ApplyNativeState(state);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            _nativeError = ex.Message;
-        }
-        finally
-        {
-            ClearNativeBusy();
-        }
-    }
-
-    private async Task ToggleNativePlaybackAsync()
-    {
-        if (_connection is null || _nativeState is not PlaybackState playback) return;
-
-        await ResumeAudioAsync();
-        SetNativeBusy(playback.IsPlaying ? "Pausing..." : "Resuming...");
-        await InvokeAsync(StateHasChanged);
-        try
-        {
-            var state = playback.IsPlaying
-                ? await _connection.PauseAsync(_cts.Token)
-                : await _connection.ResumeAsync(_cts.Token);
-            ApplyNativeState(state);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            _nativeError = ex.Message;
-        }
-        finally
-        {
-            ClearNativeBusy();
-        }
-    }
-
-    private async Task SeekNativeAsync(TimeSpan delta)
-    {
-        if (_connection is null || _nativeState is not PlaybackState playback) return;
-
-        var next = playback.Position + delta;
-        if (next < TimeSpan.Zero) next = TimeSpan.Zero;
-        if (playback.Duration > TimeSpan.Zero && next > playback.Duration) next = playback.Duration;
-
-        SetNativeBusy("Seeking...");
-        await InvokeAsync(StateHasChanged);
-        try
-        {
-            ApplyNativeState(await _connection.SeekToAsync(next, _cts.Token));
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            _nativeError = ex.Message;
-        }
-        finally
-        {
-            ClearNativeBusy();
-        }
-    }
-
-    private async Task SetNativeVolumeAsync(ChangeEventArgs args)
-    {
-        if (_connection is null) return;
-        if (!int.TryParse(args.Value?.ToString(), out var percent)) return;
-
-        try
-        {
-            ApplyNativeState(await _connection.SetVolumeAsync(Math.Clamp(percent, 0, 100) / 100f, _cts.Token));
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            _nativeError = ex.Message;
-        }
-    }
-
-    private async Task StopNativeAsync()
-    {
-        if (_connection is null) return;
-
-        SetNativeBusy("Stopping...");
-        await InvokeAsync(StateHasChanged);
-        try
-        {
-            ApplyNativeState(await _connection.StopAsync(_cts.Token));
-            _nativeCurrentTitle = null;
-            _nativeCurrentChannel = null;
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            _nativeError = ex.Message;
-        }
-        finally
-        {
-            ClearNativeBusy();
-        }
-    }
-
-    private async Task PumpNativeStatesAsync()
-    {
-        if (_connection is null) return;
-
-        try
-        {
-            await foreach (var state in _connection.StreamStatesAsync(_cts.Token))
-            {
-                ApplyNativeState(state);
-                await InvokeAsync(StateHasChanged);
-            }
-        }
-        catch (OperationCanceledException) { }
-    }
-
-    private void ApplyNativeState(SessionState state)
-    {
-        _nativeState = state;
-
-        switch (state)
-        {
-            case SearchResultsState results:
-                _nativeResults = results.Items;
-                _nativeError = results.Items.Count == 0 ? "No results." : null;
-                break;
-            case ErrorState error:
-                _nativeError = error.Message;
-                if (error.Previous is not null)
-                    _nativeState = error.Previous;
-                break;
-            default:
-                _nativeError = null;
-                break;
-        }
-    }
-
-    private async Task PumpAudioAsync()
-    {
-        if (_connection is null) return;
-
-        var decoder = OpusCodecFactory.CreateDecoder(AudioFormat.SampleRate, AudioFormat.Channels);
-        var pcm = new short[AudioFormat.SamplesPerFrame * AudioFormat.Channels];
-        var batch = new byte[AudioFormat.PcmBytesPerFrame * 4];
-        var batchBytes = 0;
-        var batchFrames = 0;
-
-        try
-        {
-            await foreach (var packet in _connection.StreamAudioAsync(_cts.Token))
-            {
-                int decodedSamples;
-                try
-                {
-                    decodedSamples = decoder.Decode(packet, pcm, AudioFormat.SamplesPerFrame);
-                }
-                catch
-                {
-                    continue;
-                }
-
-                if (decodedSamples <= 0) continue;
-
-                var byteCount = decodedSamples * AudioFormat.Channels * sizeof(short);
-                if (batchBytes + byteCount > batch.Length && batchBytes > 0)
-                {
-                    await JS.InvokeVoidAsync(
-                        "xtermBridge.writeAudio",
-                        _cts.Token,
-                        Convert.ToBase64String(batch, 0, batchBytes));
-                    batchBytes = 0;
-                    batchFrames = 0;
-                }
-
-                Buffer.BlockCopy(pcm, 0, batch, batchBytes, byteCount);
-                batchBytes += byteCount;
-                batchFrames++;
-
-                if (batchFrames < 4) continue;
-
-                await JS.InvokeVoidAsync(
-                    "xtermBridge.writeAudio",
-                    _cts.Token,
-                    Convert.ToBase64String(batch, 0, batchBytes));
-                batchBytes = 0;
-                batchFrames = 0;
-            }
-
-            if (batchBytes > 0)
-            {
-                await JS.InvokeVoidAsync(
-                    "xtermBridge.writeAudio",
-                    _cts.Token,
-                    Convert.ToBase64String(batch, 0, batchBytes));
-            }
-        }
-        catch (OperationCanceledException) { }
-        catch (JSDisconnectedException) { }
-        catch (Exception ex)
-        {
-            if (_clientView == ClientView.Terminal)
-                _writer.WriteLine($"\x1b[33maudio stopped: {ex.Message}\x1b[0m");
-            else
-                _nativeError = $"audio stopped: {ex.Message}";
-        }
-    }
-
-    private async Task PumpOutputAsync()
-    {
-        try
-        {
-            await foreach (var chunk in _writer.Output.ReadAllAsync(_cts.Token))
-                await JS.InvokeVoidAsync("xtermBridge.write", _cts.Token, chunk);
-        }
-        catch (OperationCanceledException) { }
-        catch (JSDisconnectedException) { }
-    }
-
-    private async Task StopClientAsync()
-    {
-        var connection = _connection;
-        var viewTask = _viewTask;
-        var pumpTask = _pumpTask;
-        var audioTask = _audioTask;
-        var nativeStateTask = _nativeStateTask;
-
-        try { await _cts.CancelAsync(); } catch { }
-
-        if (viewTask is not null) try { await viewTask; } catch { }
-        if (pumpTask is not null) try { await pumpTask; } catch { }
-        if (audioTask is not null) try { await audioTask; } catch { }
-        if (nativeStateTask is not null) try { await nativeStateTask; } catch { }
-
-        if (connection?.SessionId is Guid sessionId)
-        {
-            try { await connection.CloseSessionAsync(sessionId, CancellationToken.None); } catch { }
-        }
-
-        if (connection is not null)
-        {
-            try { await connection.DisposeAsync(); } catch { }
-        }
-
-        try { await JS.InvokeVoidAsync("xtermBridge.dispose"); } catch { }
-
-        _viewTask = null;
-        _pumpTask = null;
-        _audioTask = null;
-        _nativeStateTask = null;
-        _connection = null;
+        if (resetSession)
+            Session.ResetCancellation();
     }
 
     public async ValueTask DisposeAsync()
     {
-        _keyInput.Complete();
         _ref?.Dispose();
-        _writer.Dispose();
-        await StopClientAsync();
-
-        _cts.Dispose();
+        await StopClientAsync(resetSession: false);
     }
-
-    private async Task ResumeAudioAsync()
-    {
-        try { await JS.InvokeVoidAsync("xtermBridge.resumeAudio"); } catch { }
-    }
-
-    private void ResetNativeState()
-    {
-        _nativeState = new IdleState();
-        _nativeResults = [];
-        _nativeError = null;
-        ClearNativeBusy();
-        _nativeCurrentTitle = null;
-        _nativeCurrentChannel = null;
-    }
-
-    private void SetNativeBusy(string message)
-    {
-        _nativeBusy = true;
-        _nativeBusyMessage = message;
-    }
-
-    private void ClearNativeBusy()
-    {
-        _nativeBusy = false;
-        _nativeBusyMessage = null;
-    }
-
-    private static string ExtractVideoId(string url)
-    {
-        if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
-        {
-            var query = uri.Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries);
-            foreach (var part in query)
-            {
-                var pair = part.Split('=', 2);
-                if (pair.Length == 2 && pair[0] == "v")
-                    return Uri.UnescapeDataString(pair[1]);
-            }
-
-            var segment = uri.Segments.LastOrDefault();
-            if (!string.IsNullOrEmpty(segment)) return segment.TrimEnd('/');
-        }
-
-        return url;
-    }
-
-    private sealed record TerminalDims(int Cols, int Rows);
 }

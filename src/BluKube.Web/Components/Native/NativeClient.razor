@@ -1,41 +1,28 @@
+@implements IDisposable
+
 <main class="native-client">
     <div class="native-terminal">
-        <NativeSearch Query="@Query"
-                  QueryChanged="QueryChanged"
-                      Busy="Busy"
-                  BusyMessage="@BusyMessage"
-                  Error="@Error"
-                      OnSearch="OnSearch" />
+        <NativeSearch Client="Client" />
 
-        <NativePlayer State="State"
-                      Busy="Busy"
-                  CurrentTitle="@CurrentTitle"
-                  CurrentChannel="@CurrentChannel"
-                      OnTogglePlayback="OnTogglePlayback"
-                      OnSeek="OnSeek"
-                      OnVolumeChange="OnVolumeChange"
-                      OnStop="OnStop" />
+        <NativePlayer Client="Client" />
 
-        <NativeResults Results="Results"
-                       Busy="Busy"
-                       OnPlay="OnPlay" />
+        <NativeResults Client="Client" />
     </div>
 </main>
 
 @code {
-    [Parameter] public string Query { get; set; } = string.Empty;
-    [Parameter] public EventCallback<string> QueryChanged { get; set; }
-    [Parameter] public bool Busy { get; set; }
-    [Parameter] public string? BusyMessage { get; set; }
-    [Parameter] public string? Error { get; set; }
-    [Parameter, EditorRequired] public SessionState State { get; set; } = new IdleState();
-    [Parameter] public IReadOnlyList<MediaItem> Results { get; set; } = [];
-    [Parameter] public string? CurrentTitle { get; set; }
-    [Parameter] public string? CurrentChannel { get; set; }
-    [Parameter] public EventCallback OnSearch { get; set; }
-    [Parameter] public EventCallback<MediaItem> OnPlay { get; set; }
-    [Parameter] public EventCallback OnTogglePlayback { get; set; }
-    [Parameter] public EventCallback<TimeSpan> OnSeek { get; set; }
-    [Parameter] public EventCallback<ChangeEventArgs> OnVolumeChange { get; set; }
-    [Parameter] public EventCallback OnStop { get; set; }
+    [Parameter, EditorRequired] public NativeClientService Client { get; set; } = default!;
+
+    protected override void OnInitialized()
+    {
+        Client.StateChanged += RefreshAsync;
+    }
+
+    private Task RefreshAsync() =>
+        InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        Client.StateChanged -= RefreshAsync;
+    }
 }
