@@ -1,5 +1,6 @@
 using BluKube.Client.Core;
-using BluKube.Web.Services;
+using BluKube.Web.Audio;
+using BluKube.Web.Clients;
 using BluKube.Web.Storage;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -7,18 +8,18 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 
 builder.Services.AddScoped<IConfigStore, LocalStorageConfigStore>();
-builder.Services.AddScoped<ClientSessionService>();
-builder.Services.AddScoped<AudioStreamService>();
+builder.Services.AddScoped<ClientSession>();
+builder.Services.AddScoped<AudioStream>();
 builder.Services.AddScoped<TerminalKeyDispatcher>();
-builder.Services.AddScoped<TerminalClientService>();
-builder.Services.AddScoped<NativeClientService>();
-builder.Services.AddScoped<IClientViewService>(serviceProvider =>
-    serviceProvider.GetRequiredService<TerminalClientService>()
+builder.Services.AddScoped<TerminalClient>();
+builder.Services.AddScoped<NativeClient>();
+builder.Services.AddScoped<IClientView>(serviceProvider =>
+    serviceProvider.GetRequiredService<TerminalClient>()
 );
-builder.Services.AddScoped<IClientViewService>(serviceProvider =>
-    serviceProvider.GetRequiredService<NativeClientService>()
+builder.Services.AddScoped<IClientView>(serviceProvider =>
+    serviceProvider.GetRequiredService<NativeClient>()
 );
-builder.Services.AddScoped<ClientShellService>();
+builder.Services.AddScoped<ClientShell>();
 
 var app = builder.Build();
 

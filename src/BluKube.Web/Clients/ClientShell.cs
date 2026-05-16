@@ -1,6 +1,7 @@
 using Microsoft.JSInterop;
+using BluKube.Web.Clients.ErrorHandling;
 
-namespace BluKube.Web.Services;
+namespace BluKube.Web.Clients;
 
 public enum ClientState
 {
@@ -15,34 +16,42 @@ public enum ClientView
     Native,
 }
 
-public sealed class ClientShellService(
-    IJSRuntime js,
-    ClientSessionService session,
-    IEnumerable<IClientViewService> clients
-)
+public sealed class ClientShell
 {
-    private readonly IReadOnlyDictionary<ClientView, IClientViewService> _clients =
-        clients.ToDictionary(client => client.View);
+    private readonly IJSRuntime _js;
+    private readonly ClientSession _session;
+    private readonly IReadOnlyDictionary<ClientView, IClientView> _clients;
     private bool _pendingClientInit;
 
     public event EventHandler? StateChanged;
 
     public ClientState State { get; private set; } = ClientState.Loading;
     public ClientView View { get; private set; } = ClientView.Terminal;
+    public string? LoginError { get; private set; }
     public bool IsNativeView => View == ClientView.Native;
     public string PageClass => IsNativeView ? "native-page" : "terminal-page";
 
-    private IClientViewService CurrentClient => _clients[View];
+    private IClientView CurrentClient => _clients[View];
+
+    public ClientShell(IJSRuntime js, ClientSession session, IEnumerable<IClientView> clients)
+    {
+        _js = js;
+        _session = session;
+        _clients = clients.ToDictionary(client => client.View);
+        _session.StartupFailed += OnStartupFailed;
+    }
 
     public async Task InitializeAsync()
     {
-        if (!await session.HasSavedSettingsAsync())
+        if (!await _session.HasSavedSettingsAsync())
         {
+            LoginError = null;
             State = ClientState.Login;
         }
         else
         {
             View = await PreferNativeClientAsync();
+            LoginError = null;
             State = ClientState.Client;
             QueueClientInit();
         }
@@ -53,6 +62,7 @@ public sealed class ClientShellService(
     public async Task StartClientAsync()
     {
         View = await PreferNativeClientAsync();
+        LoginError = null;
         State = ClientState.Client;
         QueueClientInit();
         NotifyStateChanged();
@@ -60,14 +70,24 @@ public sealed class ClientShellService(
 
     public async Task ClearConfigAsync()
     {
-        await session.ClearSettingsAsync();
+        await _session.ClearSettingsAsync();
         await StopAsync();
 
         foreach (var client in _clients.Values)
             client.ClearState();
 
         _pendingClientInit = false;
+        LoginError = null;
         State = ClientState.Login;
+        NotifyStateChanged();
+    }
+
+    public void ClearLoginError()
+    {
+        if (LoginError is null)
+            return;
+
+        LoginError = null;
         NotifyStateChanged();
     }
 
@@ -110,7 +130,7 @@ public sealed class ClientShellService(
     {
         try
         {
-            return await js.InvokeAsync<bool>("xtermBridge.prefersNativeClient")
+            return await _js.InvokeAsync<bool>("xtermBridge.prefersNativeClient")
                 ? ClientView.Native
                 : ClientView.Terminal;
         }
@@ -118,6 +138,24 @@ public sealed class ClientShellService(
         {
             return ClientView.Terminal;
         }
+    }
+
+    private void OnStartupFailed(object? sender, ClientStartupFailedEventArgs args)
+    {
+        _ = ReturnToLoginAsync(args.Error.Message);
+    }
+
+    private async Task ReturnToLoginAsync(string message)
+    {
+        await _session.ClearSettingsAsync();
+
+        foreach (var client in _clients.Values)
+            client.ClearState();
+
+        _pendingClientInit = false;
+        LoginError = message;
+        State = ClientState.Login;
+        NotifyStateChanged();
     }
 
     private void NotifyStateChanged()

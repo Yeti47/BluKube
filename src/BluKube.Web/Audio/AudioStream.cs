@@ -1,10 +1,11 @@
 using BluKube.Contracts;
 using Concentus;
+using BluKube.Web.Clients;
 using Microsoft.JSInterop;
 
-namespace BluKube.Web.Services;
+namespace BluKube.Web.Audio;
 
-public sealed class AudioStreamService(IJSRuntime js, ClientSessionService session)
+public sealed class AudioStream(IJSRuntime js, ClientSession session)
 {
     public Task? PumpTask { get; private set; }
 

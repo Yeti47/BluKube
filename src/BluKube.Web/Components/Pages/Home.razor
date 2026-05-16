@@ -2,7 +2,7 @@
 @rendermode InteractiveServer
 @implements IAsyncDisposable
 
-@inject ClientShellService Client
+@inject ClientShell Client
 
 @using BluKube.Web.Components.Native
 @using BluKube.Web.Components.Terminal
@@ -26,7 +26,7 @@ else
         }
         else
         {
-            <NativeClient />
+            <NativeView />
         }
     </div>
 }

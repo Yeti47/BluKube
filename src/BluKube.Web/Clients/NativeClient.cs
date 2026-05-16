@@ -1,10 +1,11 @@
 using BluKube.Contracts;
+using BluKube.Web.Audio;
+using BluKube.Web.Clients.ErrorHandling;
 using Microsoft.AspNetCore.Components;
 
-namespace BluKube.Web.Services;
+namespace BluKube.Web.Clients;
 
-public sealed class NativeClientService(ClientSessionService session, AudioStreamService audio)
-    : IClientViewService
+public sealed class NativeClient(ClientSession session, AudioStream audio) : IClientView
 {
     private string _query = string.Empty;
 
@@ -51,6 +52,7 @@ public sealed class NativeClientService(ClientSessionService session, AudioStrea
         {
             await StartAsync();
         }
+        catch (ClientStartupException) { }
         catch (Exception ex)
         {
             SetError(ex.Message);

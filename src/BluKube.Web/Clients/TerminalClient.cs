@@ -1,16 +1,18 @@
 using BluKube.Tui.Rendering;
+using BluKube.Web.Audio;
+using BluKube.Web.Clients.ErrorHandling;
 using BluKube.Web.Xterm;
 using Microsoft.JSInterop;
 using Spectre.Console;
 
-namespace BluKube.Web.Services;
+namespace BluKube.Web.Clients;
 
-public sealed class TerminalClientService(
+public sealed class TerminalClient(
     IJSRuntime js,
-    ClientSessionService session,
-    AudioStreamService audio,
+    ClientSession session,
+    AudioStream audio,
     TerminalKeyDispatcher keyDispatcher
-) : IClientViewService, IAsyncDisposable
+) : IClientView, IAsyncDisposable
 {
     private readonly XtermWriter _writer = new();
     private readonly XtermKeyInput _keyInput = new();
@@ -61,6 +63,7 @@ public sealed class TerminalClientService(
         {
             await StartAsync();
         }
+        catch (ClientStartupException) { }
         catch (Exception ex)
         {
             WriteError(ex.Message);

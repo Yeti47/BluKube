@@ -1,5 +1,5 @@
 @implements IDisposable
-@inject NativeClientService Client
+@inject NativeClient Client
 
 <section class="native-search">
     <form class="native-search-form" @onsubmit="Client.SearchAsync" @onsubmit:preventDefault>

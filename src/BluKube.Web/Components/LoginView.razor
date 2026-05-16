@@ -1,16 +1,18 @@
 @inject IConfigStore ConfigStore
 @inject IConfiguration Configuration
-@inject ClientShellService Client
+@inject ClientShell Client
 
 <SetupView @bind-ServerUrl="_serverUrl"
            @bind-Token="_token"
-           Error="@_error"
+           Error="@ErrorMessage"
            OnSubmit="SaveConfigAsync" />
 
 @code {
     private string _serverUrl = string.Empty;
     private string _token = string.Empty;
     private string? _error;
+
+    private string? ErrorMessage => _error ?? Client.LoginError;
 
     protected override void OnInitialized()
     {
@@ -20,6 +22,7 @@
     private async Task SaveConfigAsync()
     {
         _error = null;
+        Client.ClearLoginError();
 
         if (string.IsNullOrWhiteSpace(_serverUrl) || string.IsNullOrWhiteSpace(_token))
         {

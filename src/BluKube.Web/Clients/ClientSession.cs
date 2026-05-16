@@ -1,10 +1,16 @@
 using BluKube.Client.Core;
+using BluKube.Web.Clients.ErrorHandling;
+using System.Diagnostics.CodeAnalysis;
+using System.Net;
+using System.Net.Sockets;
 
-namespace BluKube.Web.Services;
+namespace BluKube.Web.Clients;
 
-public sealed class ClientSessionService(IConfigStore configStore) : IAsyncDisposable
+public sealed class ClientSession(IConfigStore configStore) : IAsyncDisposable
 {
     private CancellationTokenSource _cts = new();
+
+    public event EventHandler<ClientStartupFailedEventArgs>? StartupFailed;
 
     public CancellationToken Token => _cts.Token;
     public BluKubeConnection? Connection { get; private set; }
@@ -24,10 +30,26 @@ public sealed class ClientSessionService(IConfigStore configStore) : IAsyncDispo
             ?? throw new InvalidOperationException("No connection settings found.");
 
         var connection = new BluKubeConnection(settings);
-        await connection.ConnectAsync(Token);
-        _ = await connection.CreateSessionAsync(Token);
-        Connection = connection;
-        return connection;
+
+        try
+        {
+            await connection.ConnectAsync(Token);
+            _ = await connection.CreateSessionAsync(Token);
+            Connection = connection;
+            return connection;
+        }
+        catch (Exception ex)
+        {
+            await connection.DisposeAsync();
+
+            if (ClientStartupException.TryCreate(ex, out var startupException))
+            {
+                StartupFailed?.Invoke(this, new ClientStartupFailedEventArgs(startupException));
+                throw startupException;
+            }
+
+            throw;
+        }
     }
 
     public async Task StopAsync(params Task?[] tasks)

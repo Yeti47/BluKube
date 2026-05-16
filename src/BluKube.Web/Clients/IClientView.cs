@@ -1,6 +1,6 @@
-namespace BluKube.Web.Services;
+namespace BluKube.Web.Clients;
 
-public interface IClientViewService
+public interface IClientView
 {
     ClientView View { get; }
     Task ActivateAsync();
