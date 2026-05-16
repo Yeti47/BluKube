@@ -148,10 +148,10 @@ Run them with:
 
 ```bash
 docker run --rm -p 8765:8765 -e BLUKUBE_TOKEN=replace-me blukube-server
-docker run --rm -p 8080:8080 blukube-web
+docker run --rm -p 8080:8080 --add-host=host.docker.internal:host-gateway -e BluKube__DefaultServerUrl=http://host.docker.internal:8765 blukube-web
 ```
 
-The web client container serves only the Blazor client. You still need a running BluKube server and must enter its URL/token in the app.
+The web client container serves only the Blazor client. `BluKube__DefaultServerUrl` only pre-fills the login form; the server URL/token you submit are still saved in your browser.
 
 ## Local Development
 

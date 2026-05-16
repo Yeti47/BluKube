@@ -4,186 +4,65 @@
 @inject IJSRuntime JS
 @inject IConfigStore ConfigStore
 @using Concentus
-@using BluKube.Contracts
 @using Spectre.Console
-@using BluKube.Web.Storage
+@using BluKube.Web.Components.Native
+@using BluKube.Web.Components.Terminal
 
-@if (_mode == AppMode.Loading)
+@if (_appState == AppState.Loading)
 {
     <div class="loading">Loading...</div>
 }
-else if (_mode == AppMode.Setup)
+else if (_appState == AppState.Login)
 {
-    <form class="setup" @onsubmit="SaveConfigAsync" @onsubmit:preventDefault>
-        <div class="setup-copy">
-            <h1>BluKube</h1>
-            <p>Enter your server details to get started.</p>
-        </div>
-
-        <div class="setup-fields">
-            <div class="field">
-                <label for="serverUrl">Server URL</label>
-                <input id="serverUrl" type="url" placeholder="http://localhost:8765"
-                       @bind="_serverUrl" @bind:event="oninput" />
-            </div>
-            <div class="field">
-                <label for="token">Token</label>
-                <input id="token" type="password" placeholder="Enter your access token" required
-                       @bind="_token" @bind:event="oninput" />
-            </div>
-        </div>
-
-        @if (_setupError is not null)
-        {
-            <p class="error">@_setupError</p>
-        }
-
-        <div class="setup-actions">
-            <button type="submit" disabled="@(!CanConnect)">Connect</button>
-            <p class="setup-download-cta">
-                Want a real terminal experience?
-                <a class="setup-download" href="@TuiDownloadUrl" @onclick="DownloadTuiAsync" @onclick:preventDefault>
-                    Download TUI (linux)
-                </a>
-            </p>
-        </div>
-    </form>
+    <LoginView TuiDownloadUrl="@TuiDownloadUrl"
+               OnLoggedIn="StartClientAsync"
+               OnDownloadTui="DownloadTuiAsync" />
 }
 else
 {
     <div class="client-page @(_clientView == ClientView.Native ? "native-page" : "terminal-page")">
-        <header class="client-header">
-            <div class="brand-block">
-                <AsciiLogo Class="brand-cube" />
-                <div class="brand-copy">
-                    <strong>BluKube</strong>
-                    <span class="brand-meta">Remote Client</span>
-                </div>
-            </div>
-
-            <div class="header-actions">
-                <div class="view-toggle" role="tablist" aria-label="Client view">
-                    <button type="button" class="@ViewButtonClass(ClientView.Native)" @onclick="() => SwitchClientViewAsync(ClientView.Native)">Web</button>
-                    <button type="button" class="@ViewButtonClass(ClientView.Terminal)" @onclick="() => SwitchClientViewAsync(ClientView.Terminal)">Terminal</button>
-                </div>
-                <a class="download-link" href="@TuiDownloadUrl" @onclick="DownloadTuiAsync" @onclick:preventDefault>Download TUI</a>
-                <button class="logout-button" type="button" @onclick="ClearConfigAsync" title="Clear saved server URL and token">Log out</button>
-            </div>
-        </header>
+        <ClientHeader IsNativeView="@(_clientView == ClientView.Native)"
+                      TuiDownloadUrl="@TuiDownloadUrl"
+                      OnShowNative="() => SwitchClientViewAsync(ClientView.Native)"
+                      OnShowTerminal="() => SwitchClientViewAsync(ClientView.Terminal)"
+                      OnDownloadTui="DownloadTuiAsync"
+                      OnLogout="ClearConfigAsync" />
 
         @if (_clientView == ClientView.Terminal)
         {
-            <div id="xterm-container"></div>
+            <TerminalHost />
         }
         else
         {
-            <main class="native-client">
-                <div class="native-terminal">
-                    <section class="native-search">
-                        <form class="native-search-form" @onsubmit="SearchNativeAsync" @onsubmit:preventDefault>
-                            <input type="search" placeholder="Search YouTube" @bind="_nativeQuery" @bind:event="oninput" />
-                            <button type="submit" disabled="@(_nativeBusy || string.IsNullOrWhiteSpace(_nativeQuery))">Search</button>
-                        </form>
-                        <div class="native-search-feedback">
-                            @if (_nativeError is not null)
-                            {
-                                <p class="error">@_nativeError</p>
-                            }
-                            else if (_nativeBusyMessage is not null)
-                            {
-                                <div class="busy-row" role="status" aria-live="polite">
-                                    <span class="busy-bars" aria-hidden="true"><span></span><span></span><span></span></span>
-                                    <span>@_nativeBusyMessage</span>
-                                </div>
-                            }
-                        </div>
-                    </section>
-
-                    <section class="native-player">
-                        @if (_nativeState is PlaybackState playback)
-                        {
-                            <div class="now-line @(playback.IsPlaying ? "is-playing" : "is-paused")">
-                                <span class="playback-indicator" aria-hidden="true"></span>
-                                <span class="track-copy">
-                                    <strong>@(_nativeCurrentTitle ?? playback.VideoId)</strong>
-                                    @if (!string.IsNullOrWhiteSpace(_nativeCurrentChannel))
-                                    {
-                                        <small>@_nativeCurrentChannel</small>
-                                    }
-                                </span>
-                            </div>
-                            <progress value="@ProgressValue(playback)" max="100"></progress>
-                            <div class="time-row">
-                                <span>@FormatTime(playback.Position)</span>
-                                <span>@FormatTime(playback.Duration)</span>
-                            </div>
-                            <div class="native-controls">
-                                <button type="button" class="seek-control" aria-label="Rewind 30 seconds" title="Rewind 30 seconds" @onclick="() => SeekNativeAsync(TimeSpan.FromSeconds(-30))" disabled="@_nativeBusy">&lt;&lt; 30</button>
-                                <button type="button" class="seek-control" aria-label="Rewind 10 seconds" title="Rewind 10 seconds" @onclick="() => SeekNativeAsync(TimeSpan.FromSeconds(-10))" disabled="@_nativeBusy">&lt; 10</button>
-                                <button class="primary-control @(playback.IsPlaying ? "is-playing" : "is-paused")" type="button" @onclick="ToggleNativePlaybackAsync" disabled="@_nativeBusy">@(playback.IsPlaying ? "Pause" : "Play")</button>
-                                <button type="button" class="seek-control" aria-label="Fast-forward 10 seconds" title="Fast-forward 10 seconds" @onclick="() => SeekNativeAsync(TimeSpan.FromSeconds(10))" disabled="@_nativeBusy">10 &gt;</button>
-                                <button type="button" class="seek-control" aria-label="Fast-forward 30 seconds" title="Fast-forward 30 seconds" @onclick="() => SeekNativeAsync(TimeSpan.FromSeconds(30))" disabled="@_nativeBusy">30 &gt;&gt;</button>
-                                <button type="button" @onclick="StopNativeAsync" disabled="@_nativeBusy">Stop</button>
-                            </div>
-                            <label class="volume-control">
-                                <span>Volume</span>
-                                <input type="range" min="0" max="100" value="@VolumePercent(playback)" @oninput="SetNativeVolumeAsync" disabled="@_nativeBusy" />
-                                <span>@VolumePercent(playback)%</span>
-                            </label>
-                        }
-                        else
-                        {
-                            <div class="empty-player">
-                                <span>No active playback.</span>
-                            </div>
-                        }
-                    </section>
-
-                    @if (_nativeResults.Count > 0)
-                    {
-                        <section class="native-results" aria-label="Search results">
-                            @foreach (var item in _nativeResults)
-                            {
-                                <button type="button" class="result-row" @onclick="() => PlayNativeAsync(item)" disabled="@_nativeBusy">
-                                    <span>
-                                        <strong>@item.Title</strong>
-                                        <small>@item.Channel</small>
-                                    </span>
-                                    @if (IsLiveDuration(item.Duration))
-                                    {
-                                        <span class="live-pill">LIVE</span>
-                                    }
-                                    else
-                                    {
-                                        <span>@FormatTime(item.Duration)</span>
-                                    }
-                                </button>
-                            }
-                        </section>
-                    }
-                </div>
-            </main>
+            <NativeClient @bind-Query="_nativeQuery"
+                          Busy="_nativeBusy"
+                          BusyMessage="@_nativeBusyMessage"
+                          Error="@_nativeError"
+                          State="_nativeState"
+                          Results="_nativeResults"
+                          CurrentTitle="@_nativeCurrentTitle"
+                          CurrentChannel="@_nativeCurrentChannel"
+                          OnSearch="SearchNativeAsync"
+                          OnPlay="PlayNativeAsync"
+                          OnTogglePlayback="ToggleNativePlaybackAsync"
+                          OnSeek="SeekNativeAsync"
+                          OnVolumeChange="SetNativeVolumeAsync"
+                          OnStop="StopNativeAsync" />
         }
     </div>
 }
 
 @code {
-    private enum AppMode { Loading, Setup, Client }
+    private enum AppState { Loading, Login, Client }
     private enum ClientView { Terminal, Native }
 
     private const string TuiDownloadUrl = "https://github.com/Yeti47/BluKube/releases/latest/download/blukube-linux-x64.tar.gz";
     private const string TuiDownloadFileName = "blukube-linux-x64.tar.gz";
 
-    private AppMode _mode = AppMode.Loading;
+    private AppState _appState = AppState.Loading;
     private ClientView _clientView = ClientView.Terminal;
     private bool _pendingTerminalInit;
     private bool _pendingNativeInit;
-
-    private string _serverUrl = string.Empty;
-    private string _token = string.Empty;
-    private string? _setupError;
-    private bool CanConnect =>
-        !string.IsNullOrWhiteSpace(_serverUrl) && !string.IsNullOrWhiteSpace(_token);
 
     private readonly XtermWriter _writer = new();
     private readonly XtermKeyInput _keyInput = new();
@@ -214,12 +93,12 @@ else
             var settings = await ConfigStore.LoadAsync(_cts.Token);
             if (settings is null)
             {
-                _mode = AppMode.Setup;
+                _appState = AppState.Login;
             }
             else
             {
                 _clientView = await PreferNativeClientAsync();
-                _mode = AppMode.Client;
+                _appState = AppState.Client;
                 QueueClientInit();
             }
 
@@ -256,27 +135,10 @@ else
         }
     }
 
-    private async Task SaveConfigAsync()
+    private async Task StartClientAsync()
     {
-        _setupError = null;
-
-        if (string.IsNullOrWhiteSpace(_serverUrl) || string.IsNullOrWhiteSpace(_token))
-        {
-            _setupError = "Server URL and token are required.";
-            return;
-        }
-
-        if (!Uri.TryCreate(_serverUrl.Trim(), UriKind.Absolute, out var uri)
-            || (uri.Scheme != "http" && uri.Scheme != "https"))
-        {
-            _setupError = "Please enter a valid http/https URL.";
-            return;
-        }
-
-        await ConfigStore.SaveAsync(new ConnectionSettings(uri, _token.Trim()), _cts.Token);
-
         _clientView = await PreferNativeClientAsync();
-        _mode = AppMode.Client;
+        _appState = AppState.Client;
         QueueClientInit();
     }
 
@@ -293,14 +155,11 @@ else
         _cts.Dispose();
         _cts = new CancellationTokenSource();
 
-        _serverUrl = string.Empty;
-        _token = string.Empty;
-        _setupError = null;
         _nativeQuery = string.Empty;
         ResetNativeState();
         _pendingTerminalInit = false;
         _pendingNativeInit = false;
-        _mode = AppMode.Setup;
+        _appState = AppState.Login;
     }
 
     private async Task SwitchClientViewAsync(ClientView view)
@@ -709,24 +568,6 @@ else
         _nativeBusy = false;
         _nativeBusyMessage = null;
     }
-
-    private string ViewButtonClass(ClientView view) =>
-        _clientView == view ? "active" : string.Empty;
-
-    private static int ProgressValue(PlaybackState playback) =>
-        playback.Duration.TotalSeconds > 0
-            ? (int)Math.Round(Math.Clamp(playback.Position.TotalSeconds / playback.Duration.TotalSeconds, 0d, 1d) * 100)
-            : 0;
-
-    private static int VolumePercent(PlaybackState playback) =>
-        (int)Math.Round(Math.Clamp(playback.Volume, 0f, 1f) * 100);
-
-    private static string FormatTime(TimeSpan time) =>
-        time.TotalHours >= 1
-            ? $"{(int)time.TotalHours}:{time.Minutes:D2}:{time.Seconds:D2}"
-            : $"{time.Minutes}:{time.Seconds:D2}";
-
-    private static bool IsLiveDuration(TimeSpan duration) => duration <= TimeSpan.Zero;
 
     private static string ExtractVideoId(string url)
     {

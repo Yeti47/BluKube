@@ -1,0 +1,48 @@
+@inject IConfigStore ConfigStore
+@inject IConfiguration Configuration
+
+<SetupView @bind-ServerUrl="_serverUrl"
+           @bind-Token="_token"
+           Error="@_error"
+           TuiDownloadUrl="@TuiDownloadUrl"
+           OnSubmit="SaveConfigAsync"
+           OnDownloadTui="OnDownloadTui" />
+
+@code {
+    [Parameter, EditorRequired] public string TuiDownloadUrl { get; set; } = string.Empty;
+    [Parameter] public EventCallback OnLoggedIn { get; set; }
+    [Parameter] public EventCallback OnDownloadTui { get; set; }
+
+    private string _serverUrl = string.Empty;
+    private string _token = string.Empty;
+    private string? _error;
+
+    protected override void OnInitialized()
+    {
+        _serverUrl = DefaultServerUrl;
+    }
+
+    private async Task SaveConfigAsync()
+    {
+        _error = null;
+
+        if (string.IsNullOrWhiteSpace(_serverUrl) || string.IsNullOrWhiteSpace(_token))
+        {
+            _error = "Server URL and token are required.";
+            return;
+        }
+
+        if (!Uri.TryCreate(_serverUrl.Trim(), UriKind.Absolute, out var uri)
+            || (uri.Scheme != "http" && uri.Scheme != "https"))
+        {
+            _error = "Please enter a valid http/https URL.";
+            return;
+        }
+
+        await ConfigStore.SaveAsync(new ConnectionSettings(uri, _token.Trim()));
+        await OnLoggedIn.InvokeAsync();
+    }
+
+    private string DefaultServerUrl =>
+        Configuration["BluKube:DefaultServerUrl"]?.Trim() ?? string.Empty;
+}

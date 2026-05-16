@@ -1,0 +1,54 @@
+<form class="setup" @onsubmit="OnSubmit" @onsubmit:preventDefault>
+    <div class="setup-copy">
+        <h1>BluKube</h1>
+        <p>Enter your server details to get started.</p>
+    </div>
+
+    <div class="setup-fields">
+        <div class="field">
+            <label for="serverUrl">Server URL</label>
+            <input id="serverUrl" type="url" placeholder="http://localhost:8765"
+                   value="@ServerUrl" @oninput="UpdateServerUrl" />
+        </div>
+        <div class="field">
+            <label for="token">Token</label>
+            <input id="token" type="password" placeholder="Enter your access token" required
+                   value="@Token" @oninput="UpdateToken" />
+        </div>
+    </div>
+
+    @if (Error is not null)
+    {
+        <p class="error">@Error</p>
+    }
+
+    <div class="setup-actions">
+        <button type="submit" disabled="@(!CanConnect)">Connect</button>
+        <p class="setup-download-cta">
+            Want a real terminal experience?
+            <a class="setup-download" href="@TuiDownloadUrl" @onclick="OnDownloadTui" @onclick:preventDefault>
+                Download TUI (linux)
+            </a>
+        </p>
+    </div>
+</form>
+
+@code {
+    [Parameter] public string ServerUrl { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> ServerUrlChanged { get; set; }
+    [Parameter] public string Token { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> TokenChanged { get; set; }
+    [Parameter] public string? Error { get; set; }
+    [Parameter, EditorRequired] public string TuiDownloadUrl { get; set; } = string.Empty;
+    [Parameter] public EventCallback OnSubmit { get; set; }
+    [Parameter] public EventCallback OnDownloadTui { get; set; }
+
+    private bool CanConnect =>
+        !string.IsNullOrWhiteSpace(ServerUrl) && !string.IsNullOrWhiteSpace(Token);
+
+    private Task UpdateServerUrl(ChangeEventArgs args) =>
+        ServerUrlChanged.InvokeAsync(args.Value?.ToString() ?? string.Empty);
+
+    private Task UpdateToken(ChangeEventArgs args) =>
+        TokenChanged.InvokeAsync(args.Value?.ToString() ?? string.Empty);
+}

@@ -36,7 +36,7 @@ internal sealed class PlaybackPanel(
             .AddRow(new Markup("[grey]title[/]"), new SanitizedText(title, fallback: playback.VideoId))
             .AddRow(new Markup("[grey]channel[/]"), new SanitizedText(channel))
             .AddRow(new Markup("[grey]video[/]"), new Markup(Markup.Escape(playback.VideoId)))
-            .AddRow(new Markup("[grey]state[/]"), new Markup(playback.IsPlaying ? "[purple]playing[/]" : "[yellow]paused[/]"))
+            .AddRow(new Markup("[grey]state[/]"), new Markup(playback.IsPlaying ? "[green]playing[/]" : "[yellow]paused[/]"))
             .AddRow(new Markup("[grey]time[/]"), new TimeRangeLabel(playback.Position, playback.Duration));
 
         var volumeRow = new Grid().AddColumn().AddColumn()
@@ -58,7 +58,7 @@ internal sealed class PlaybackPanel(
     private IRenderable BuildCompact(PlaybackState playback)
     {
         var stack = new Grid().AddColumn().AddColumn()
-            .AddRow(new Markup("[grey]state[/]"), new Markup(playback.IsPlaying ? "[purple]playing[/]" : "[yellow]paused[/]"))
+            .AddRow(new Markup("[grey]state[/]"), new Markup(playback.IsPlaying ? "[green]playing[/]" : "[yellow]paused[/]"))
             .AddRow(new Markup("[grey]time[/]"), new TimeRangeLabel(playback.Position, playback.Duration))
             .AddRow(new Markup("[grey]volume[/]"), new Markup($"{(int)Math.Round(playback.Volume * 100)}%"));
 

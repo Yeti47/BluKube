@@ -1,0 +1,35 @@
+@if (Results.Count > 0)
+{
+    <section class="native-results" aria-label="Search results">
+        @foreach (var item in Results)
+        {
+            <button type="button" class="result-row" @onclick="() => OnPlay.InvokeAsync(item)" disabled="@Busy">
+                <span>
+                    <strong>@item.Title</strong>
+                    <small>@item.Channel</small>
+                </span>
+                @if (IsLiveDuration(item.Duration))
+                {
+                    <span class="live-pill">LIVE</span>
+                }
+                else
+                {
+                    <span>@FormatTime(item.Duration)</span>
+                }
+            </button>
+        }
+    </section>
+}
+
+@code {
+    [Parameter] public IReadOnlyList<MediaItem> Results { get; set; } = [];
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public EventCallback<MediaItem> OnPlay { get; set; }
+
+    private static bool IsLiveDuration(TimeSpan duration) => duration <= TimeSpan.Zero;
+
+    private static string FormatTime(TimeSpan time) =>
+        time.TotalHours >= 1
+            ? $"{(int)time.TotalHours}:{time.Minutes:D2}:{time.Seconds:D2}"
+            : $"{time.Minutes}:{time.Seconds:D2}";
+}

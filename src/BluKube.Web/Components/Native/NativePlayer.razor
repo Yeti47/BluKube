@@ -1,0 +1,63 @@
+<section class="native-player">
+    @if (State is PlaybackState playback)
+    {
+        <div class="now-line @(playback.IsPlaying ? "is-playing" : "is-paused")">
+            <span class="playback-indicator" aria-hidden="true"></span>
+            <span class="track-copy">
+                <strong>@(CurrentTitle ?? playback.VideoId)</strong>
+                @if (!string.IsNullOrWhiteSpace(CurrentChannel))
+                {
+                    <small>@CurrentChannel</small>
+                }
+            </span>
+        </div>
+        <progress value="@ProgressValue(playback)" max="100"></progress>
+        <div class="time-row">
+            <span>@FormatTime(playback.Position)</span>
+            <span>@FormatTime(playback.Duration)</span>
+        </div>
+        <div class="native-controls">
+            <button type="button" class="seek-control" aria-label="Rewind 30 seconds" title="Rewind 30 seconds" @onclick="() => OnSeek.InvokeAsync(TimeSpan.FromSeconds(-30))" disabled="@Busy">&lt;&lt; 30</button>
+            <button type="button" class="seek-control" aria-label="Rewind 10 seconds" title="Rewind 10 seconds" @onclick="() => OnSeek.InvokeAsync(TimeSpan.FromSeconds(-10))" disabled="@Busy">&lt; 10</button>
+            <button class="primary-control @(playback.IsPlaying ? "is-playing" : "is-paused")" type="button" @onclick="OnTogglePlayback" disabled="@Busy">@(playback.IsPlaying ? "Pause" : "Play")</button>
+            <button type="button" class="seek-control" aria-label="Fast-forward 10 seconds" title="Fast-forward 10 seconds" @onclick="() => OnSeek.InvokeAsync(TimeSpan.FromSeconds(10))" disabled="@Busy">10 &gt;</button>
+            <button type="button" class="seek-control" aria-label="Fast-forward 30 seconds" title="Fast-forward 30 seconds" @onclick="() => OnSeek.InvokeAsync(TimeSpan.FromSeconds(30))" disabled="@Busy">30 &gt;&gt;</button>
+            <button type="button" @onclick="OnStop" disabled="@Busy">Stop</button>
+        </div>
+        <label class="volume-control">
+            <span>Volume</span>
+            <input type="range" min="0" max="100" value="@VolumePercent(playback)" @oninput="OnVolumeChange" disabled="@Busy" />
+            <span>@VolumePercent(playback)%</span>
+        </label>
+    }
+    else
+    {
+        <div class="empty-player">
+            <span>No active playback.</span>
+        </div>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public SessionState State { get; set; } = new IdleState();
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public string? CurrentTitle { get; set; }
+    [Parameter] public string? CurrentChannel { get; set; }
+    [Parameter] public EventCallback OnTogglePlayback { get; set; }
+    [Parameter] public EventCallback<TimeSpan> OnSeek { get; set; }
+    [Parameter] public EventCallback<ChangeEventArgs> OnVolumeChange { get; set; }
+    [Parameter] public EventCallback OnStop { get; set; }
+
+    private static int ProgressValue(PlaybackState playback) =>
+        playback.Duration.TotalSeconds > 0
+            ? (int)Math.Round(Math.Clamp(playback.Position.TotalSeconds / playback.Duration.TotalSeconds, 0d, 1d) * 100)
+            : 0;
+
+    private static int VolumePercent(PlaybackState playback) =>
+        (int)Math.Round(Math.Clamp(playback.Volume, 0f, 1f) * 100);
+
+    private static string FormatTime(TimeSpan time) =>
+        time.TotalHours >= 1
+            ? $"{(int)time.TotalHours}:{time.Minutes:D2}:{time.Seconds:D2}"
+            : $"{time.Minutes}:{time.Seconds:D2}";
+}

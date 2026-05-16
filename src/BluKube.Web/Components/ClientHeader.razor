@@ -1,0 +1,27 @@
+<header class="client-header">
+    <div class="brand-block">
+        <AsciiLogo Class="brand-cube" />
+        <div class="brand-copy">
+            <strong>BluKube</strong>
+            <span class="brand-meta">Remote Client</span>
+        </div>
+    </div>
+
+    <div class="header-actions">
+        <div class="view-toggle" role="tablist" aria-label="Client view">
+            <button type="button" class="@(IsNativeView ? "active" : string.Empty)" @onclick="OnShowNative">Web</button>
+            <button type="button" class="@(IsNativeView ? string.Empty : "active")" @onclick="OnShowTerminal">Terminal</button>
+        </div>
+        <a class="download-link" href="@TuiDownloadUrl" @onclick="OnDownloadTui" @onclick:preventDefault>Download TUI</a>
+        <button class="logout-button" type="button" @onclick="OnLogout" title="Clear saved server URL and token">Log out</button>
+    </div>
+</header>
+
+@code {
+    [Parameter] public bool IsNativeView { get; set; }
+    [Parameter, EditorRequired] public string TuiDownloadUrl { get; set; } = string.Empty;
+    [Parameter] public EventCallback OnShowNative { get; set; }
+    [Parameter] public EventCallback OnShowTerminal { get; set; }
+    [Parameter] public EventCallback OnDownloadTui { get; set; }
+    [Parameter] public EventCallback OnLogout { get; set; }
+}
