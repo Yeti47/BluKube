@@ -1,196 +1,69 @@
 @page "/"
 @rendermode InteractiveServer
 @implements IAsyncDisposable
-@inject IJSRuntime JS
-@inject ClientSessionService Session
-@inject AudioStreamService Audio
-@inject TerminalClientService Terminal
-@inject NativeClientService Native
+
+@inject ClientShellService Client
 
 @using BluKube.Web.Components.Native
 @using BluKube.Web.Components.Terminal
 
-@if (_appState == AppState.Loading)
+@if (Client.State == ClientState.Loading)
 {
     <div class="loading">Loading...</div>
 }
-else if (_appState == AppState.Login)
+else if (Client.State == ClientState.Login)
 {
-    <LoginView TuiDownloadUrl="@TuiDownloadUrl"
-               OnLoggedIn="StartClientAsync"
-               OnDownloadTui="DownloadTuiAsync" />
+    <LoginView />
 }
 else
 {
-    <div class="client-page @(_clientView == ClientView.Native ? "native-page" : "terminal-page")">
-        <ClientHeader IsNativeView="@(_clientView == ClientView.Native)"
-                      TuiDownloadUrl="@TuiDownloadUrl"
-                      OnShowNative="() => SwitchClientViewAsync(ClientView.Native)"
-                      OnShowTerminal="() => SwitchClientViewAsync(ClientView.Terminal)"
-                      OnDownloadTui="DownloadTuiAsync"
-                      OnLogout="ClearConfigAsync" />
+    <div class="client-page @Client.PageClass">
+        <ClientHeader />
 
-        @if (_clientView == ClientView.Terminal)
+        @if (Client.View == ClientView.Terminal)
         {
             <TerminalHost />
         }
         else
         {
-            <NativeClient Client="Native" />
+            <NativeClient />
         }
     </div>
 }
 
 @code {
-    private enum AppState { Loading, Login, Client }
-    private enum ClientView { Terminal, Native }
-
-    private const string TuiDownloadUrl = "https://github.com/Yeti47/BluKube/releases/latest/download/blukube-linux-x64.tar.gz";
-    private const string TuiDownloadFileName = "blukube-linux-x64.tar.gz";
-
-    private AppState _appState = AppState.Loading;
-    private ClientView _clientView = ClientView.Terminal;
-    private bool _pendingTerminalInit;
-    private bool _pendingNativeInit;
-
     private DotNetObjectReference<Home>? _ref;
+
+    protected override void OnInitialized()
+    {
+        Client.StateChanged += Refresh;
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
             _ref = DotNetObjectReference.Create(this);
-
-            if (!await Session.HasSavedSettingsAsync())
-            {
-                _appState = AppState.Login;
-            }
-            else
-            {
-                _clientView = await PreferNativeClientAsync();
-                _appState = AppState.Client;
-                QueueClientInit();
-            }
-
-            StateHasChanged();
+            await Client.InitializeAsync();
             return;
         }
 
-        if (_pendingTerminalInit)
-        {
-            _pendingTerminalInit = false;
-            try
-            {
-                await InitTerminalAsync();
-            }
-            catch (Exception ex)
-            {
-                Terminal.WriteError(ex.Message);
-            }
-        }
-
-        if (_pendingNativeInit)
-        {
-            _pendingNativeInit = false;
-            try
-            {
-                await InitNativeAsync();
-            }
-            catch (Exception ex)
-            {
-                Native.SetError(ex.Message);
-                await InvokeAsync(StateHasChanged);
-            }
-        }
-    }
-
-    private async Task StartClientAsync()
-    {
-        _clientView = await PreferNativeClientAsync();
-        _appState = AppState.Client;
-        QueueClientInit();
-    }
-
-    private async Task DownloadTuiAsync()
-    {
-        await JS.InvokeVoidAsync("xtermBridge.downloadFile", TuiDownloadUrl, TuiDownloadFileName);
-    }
-
-    private async Task ClearConfigAsync()
-    {
-        await Session.ClearSettingsAsync();
-        await StopClientAsync();
-
-        Native.Query = string.Empty;
-        Native.Reset();
-        _pendingTerminalInit = false;
-        _pendingNativeInit = false;
-        _appState = AppState.Login;
-    }
-
-    private async Task SwitchClientViewAsync(ClientView view)
-    {
-        if (_clientView == view) return;
-
-        await StopClientAsync();
-
-        _clientView = view;
-        Native.Reset();
-        QueueClientInit();
-    }
-
-    private void QueueClientInit()
-    {
-        _pendingTerminalInit = _clientView == ClientView.Terminal;
-        _pendingNativeInit = _clientView == ClientView.Native;
-    }
-
-    private async Task<ClientView> PreferNativeClientAsync()
-    {
-        try
-        {
-            return await JS.InvokeAsync<bool>("xtermBridge.prefersNativeClient")
-                ? ClientView.Native
-                : ClientView.Terminal;
-        }
-        catch
-        {
-            return ClientView.Terminal;
-        }
-    }
-
-    private async Task InitTerminalAsync()
-    {
-        if (_ref is null) return;
-
-        await Terminal.StartAsync(_ref);
-    }
-
-    private async Task InitNativeAsync()
-    {
-        await Native.StartAsync();
+        await Client.StartPendingClientAsync(_ref);
     }
 
     [JSInvokable]
     public void OnXtermKey(string key, bool shift, bool ctrl, bool alt) =>
-        Terminal.PostKey(key, shift, ctrl, alt);
+        Client.PostKey(key, shift, ctrl, alt);
 
-    private async Task StopClientAsync(bool resetSession = true)
+    private void Refresh(object? sender, EventArgs args)
     {
-        await Session.StopAsync(Terminal.ViewTask, Terminal.PumpTask, Audio.PumpTask, Native.StateTask);
-        await Terminal.DisposeXtermAsync();
-
-        Terminal.ClearTasks();
-        Native.ClearTasks();
-        Audio.Clear();
-
-        if (resetSession)
-            Session.ResetCancellation();
+        _ = InvokeAsync(StateHasChanged);
     }
 
     public async ValueTask DisposeAsync()
     {
+        Client.StateChanged -= Refresh;
         _ref?.Dispose();
-        await StopClientAsync(resetSession: false);
+        await Client.StopAsync(resetSession: false);
     }
 }

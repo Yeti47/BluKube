@@ -1,28 +1,9 @@
-@implements IDisposable
-
 <main class="native-client">
     <div class="native-terminal">
-        <NativeSearch Client="Client" />
+        <NativeSearch />
 
-        <NativePlayer Client="Client" />
+        <NativePlayer />
 
-        <NativeResults Client="Client" />
+        <NativeResults />
     </div>
 </main>
-
-@code {
-    [Parameter, EditorRequired] public NativeClientService Client { get; set; } = default!;
-
-    protected override void OnInitialized()
-    {
-        Client.StateChanged += RefreshAsync;
-    }
-
-    private Task RefreshAsync() =>
-        InvokeAsync(StateHasChanged);
-
-    public void Dispose()
-    {
-        Client.StateChanged -= RefreshAsync;
-    }
-}

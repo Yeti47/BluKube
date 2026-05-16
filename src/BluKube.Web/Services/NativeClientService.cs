@@ -5,7 +5,7 @@ namespace BluKube.Web.Services;
 
 public sealed class NativeClientService(ClientSessionService session, AudioStreamService audio)
 {
-    public event Func<Task>? StateChanged;
+    public event EventHandler? StateChanged;
 
     public Task? StateTask { get; private set; }
     public string Query { get; set; } = string.Empty;
@@ -25,7 +25,7 @@ public sealed class NativeClientService(ClientSessionService session, AudioStrea
         audio.Start(message =>
         {
             Error = message;
-            _ = NotifyStateChangedAsync();
+            NotifyStateChanged();
         });
     }
 
@@ -55,7 +55,7 @@ public sealed class NativeClientService(ClientSessionService session, AudioStrea
         SetBusy("Searching...");
         Error = null;
         Results = [];
-        await NotifyStateChangedAsync();
+        NotifyStateChanged();
 
         try
         {
@@ -82,7 +82,7 @@ public sealed class NativeClientService(ClientSessionService session, AudioStrea
         Error = null;
         CurrentTitle = item.Title;
         CurrentChannel = item.Channel;
-        await NotifyStateChangedAsync();
+        NotifyStateChanged();
 
         try
         {
@@ -106,7 +106,7 @@ public sealed class NativeClientService(ClientSessionService session, AudioStrea
 
         await audio.ResumeAsync();
         SetBusy(playback.IsPlaying ? "Pausing..." : "Resuming...");
-        await NotifyStateChangedAsync();
+        NotifyStateChanged();
 
         try
         {
@@ -135,7 +135,7 @@ public sealed class NativeClientService(ClientSessionService session, AudioStrea
         if (playback.Duration > TimeSpan.Zero && next > playback.Duration) next = playback.Duration;
 
         SetBusy("Seeking...");
-        await NotifyStateChangedAsync();
+        NotifyStateChanged();
 
         try
         {
@@ -173,7 +173,7 @@ public sealed class NativeClientService(ClientSessionService session, AudioStrea
         if (connection is null) return;
 
         SetBusy("Stopping...");
-        await NotifyStateChangedAsync();
+        NotifyStateChanged();
 
         try
         {
@@ -201,7 +201,7 @@ public sealed class NativeClientService(ClientSessionService session, AudioStrea
             await foreach (var state in connection.StreamStatesAsync(session.Token))
             {
                 ApplyState(state);
-                await NotifyStateChangedAsync();
+                NotifyStateChanged();
             }
         }
         catch (OperationCanceledException) { }
@@ -240,11 +240,10 @@ public sealed class NativeClientService(ClientSessionService session, AudioStrea
         BusyMessage = null;
     }
 
-    private async Task NotifyStateChangedAsync()
+    private void NotifyStateChanged()
     {
         var handler = StateChanged;
-        if (handler is not null)
-            await handler.Invoke();
+        handler?.Invoke(this, EventArgs.Empty);
     }
 
     private static string ExtractVideoId(string url)

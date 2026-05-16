@@ -1,18 +1,13 @@
 @inject IConfigStore ConfigStore
 @inject IConfiguration Configuration
+@inject ClientShellService Client
 
 <SetupView @bind-ServerUrl="_serverUrl"
            @bind-Token="_token"
            Error="@_error"
-           TuiDownloadUrl="@TuiDownloadUrl"
-           OnSubmit="SaveConfigAsync"
-           OnDownloadTui="OnDownloadTui" />
+           OnSubmit="SaveConfigAsync" />
 
 @code {
-    [Parameter, EditorRequired] public string TuiDownloadUrl { get; set; } = string.Empty;
-    [Parameter] public EventCallback OnLoggedIn { get; set; }
-    [Parameter] public EventCallback OnDownloadTui { get; set; }
-
     private string _serverUrl = string.Empty;
     private string _token = string.Empty;
     private string? _error;
@@ -40,7 +35,7 @@
         }
 
         await ConfigStore.SaveAsync(new ConnectionSettings(uri, _token.Trim()));
-        await OnLoggedIn.InvokeAsync();
+        await Client.StartClientAsync();
     }
 
     private string DefaultServerUrl =>

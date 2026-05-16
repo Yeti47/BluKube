@@ -12,6 +12,7 @@ builder.Services.AddScoped<ClientSessionService>();
 builder.Services.AddScoped<AudioStreamService>();
 builder.Services.AddScoped<TerminalClientService>();
 builder.Services.AddScoped<NativeClientService>();
+builder.Services.AddScoped<ClientShellService>();
 
 var app = builder.Build();
 

@@ -77,28 +77,6 @@ window.xtermBridge = (() => {
             resumeAudio();
         },
 
-        async downloadFile(url, fileName) {
-            try {
-                const response = await fetch(url, { credentials: 'omit' });
-                if (!response.ok) throw new Error(`Download failed with ${response.status}`);
-
-                const blob = await response.blob();
-                const objectUrl = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = objectUrl;
-                link.download = fileName || url.split('/').pop() || 'download';
-                link.rel = 'noopener';
-                link.style.display = 'none';
-                document.body.appendChild(link);
-                link.click();
-                link.remove();
-
-                window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-            } catch {
-                window.open(url, '_blank', 'noopener');
-            }
-        },
-
         /**
          * Initialise an xterm.js Terminal inside the given container element.
          *

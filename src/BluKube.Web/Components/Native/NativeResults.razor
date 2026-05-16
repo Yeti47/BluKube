@@ -1,3 +1,6 @@
+@implements IDisposable
+@inject NativeClientService Client
+
 @if (Client.Results.Count > 0)
 {
     <section class="native-results" aria-label="Search results">
@@ -22,7 +25,20 @@
 }
 
 @code {
-    [Parameter, EditorRequired] public NativeClientService Client { get; set; } = default!;
+    protected override void OnInitialized()
+    {
+        Client.StateChanged += Client_StateChanged;
+    }
+
+    private void Client_StateChanged(object? sender, EventArgs args)
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        Client.StateChanged -= Client_StateChanged;
+    }
 
     private static bool IsLiveDuration(TimeSpan duration) => duration <= TimeSpan.Zero;
 

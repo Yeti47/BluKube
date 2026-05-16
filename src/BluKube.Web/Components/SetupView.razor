@@ -26,7 +26,7 @@
         <button type="submit" disabled="@(!CanConnect)">Connect</button>
         <p class="setup-download-cta">
             Want a real terminal experience?
-            <a class="setup-download" href="@TuiDownloadUrl" @onclick="OnDownloadTui" @onclick:preventDefault>
+            <a class="setup-download" href="@TuiRelease.LinuxX64DownloadUrl">
                 Download TUI (linux)
             </a>
         </p>
@@ -39,9 +39,7 @@
     [Parameter] public string Token { get; set; } = string.Empty;
     [Parameter] public EventCallback<string> TokenChanged { get; set; }
     [Parameter] public string? Error { get; set; }
-    [Parameter, EditorRequired] public string TuiDownloadUrl { get; set; } = string.Empty;
     [Parameter] public EventCallback OnSubmit { get; set; }
-    [Parameter] public EventCallback OnDownloadTui { get; set; }
 
     private bool CanConnect =>
         !string.IsNullOrWhiteSpace(ServerUrl) && !string.IsNullOrWhiteSpace(Token);

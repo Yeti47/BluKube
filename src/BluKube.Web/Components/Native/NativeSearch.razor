@@ -1,3 +1,6 @@
+@implements IDisposable
+@inject NativeClientService Client
+
 <section class="native-search">
     <form class="native-search-form" @onsubmit="Client.SearchAsync" @onsubmit:preventDefault>
         <input type="search" placeholder="Search YouTube" value="@Client.Query" @oninput="UpdateQuery" />
@@ -19,8 +22,21 @@
 </section>
 
 @code {
-    [Parameter, EditorRequired] public NativeClientService Client { get; set; } = default!;
+    protected override void OnInitialized()
+    {
+        Client.StateChanged += Client_StateChanged;
+    }
 
     private void UpdateQuery(ChangeEventArgs args) =>
         Client.Query = args.Value?.ToString() ?? string.Empty;
+
+    private void Client_StateChanged(object? sender, EventArgs args)
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        Client.StateChanged -= Client_StateChanged;
+    }
 }
