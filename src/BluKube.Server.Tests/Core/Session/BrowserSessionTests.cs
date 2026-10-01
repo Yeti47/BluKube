@@ -172,4 +172,26 @@ public sealed class BrowserSessionTests
 
         Assert.True(session.LastActivityAt > before);
     }
+
+    [Fact]
+    public async Task LastActivityAt_StaysCurrent_WhileStateStreamIsOpen()
+    {
+        var fake = new FakeMediaPlayer();
+        var session = new BrowserSession(fake, fake);
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var enumerator = session.States(cts.Token).GetAsyncEnumerator(cts.Token);
+        Assert.True(await enumerator.MoveNextAsync());
+
+        // No commands are issued, but an attached listener must keep the
+        // session alive (regression: sessions were reaped mid-playback).
+        await Task.Delay(50);
+        Assert.True(DateTimeOffset.UtcNow - session.LastActivityAt < TimeSpan.FromMilliseconds(20));
+
+        await enumerator.DisposeAsync();
+        var afterDetach = session.LastActivityAt;
+
+        await Task.Delay(50);
+        Assert.Equal(afterDetach, session.LastActivityAt);
+    }
 }

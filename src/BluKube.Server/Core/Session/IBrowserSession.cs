@@ -12,8 +12,9 @@ public interface IBrowserSession : IAsyncDisposable
     SessionState Current { get; }
 
     /// <summary>
-    /// Wall-clock timestamp of the last command or state subscription on
-    /// this session. Used by the idle sweeper to reap forgotten sessions.
+    /// Wall-clock timestamp of the last command on this session, or "now"
+    /// while any state/audio stream is open. Used by the idle sweeper to reap
+    /// forgotten sessions.
     /// </summary>
     DateTimeOffset LastActivityAt { get; }
 

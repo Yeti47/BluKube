@@ -23,6 +23,7 @@ public sealed class BrowserSession : IBrowserSession
 
     private SessionState _current = new IdleState();
     private long _lastActivityTicks = DateTimeOffset.UtcNow.UtcTicks;
+    private int _activeStreams;
     private Task? _eventPump;
 
     public Guid Id { get; } = Guid.NewGuid();
@@ -38,8 +39,12 @@ public sealed class BrowserSession : IBrowserSession
         }
     }
 
+    // An open state or audio stream means a client is actively attached, so
+    // the session is never idle while one is running.
     public DateTimeOffset LastActivityAt =>
-        new(Interlocked.Read(ref _lastActivityTicks), TimeSpan.Zero);
+        Volatile.Read(ref _activeStreams) > 0
+            ? DateTimeOffset.UtcNow
+            : new(Interlocked.Read(ref _lastActivityTicks), TimeSpan.Zero);
 
     public BrowserSession(
         IMediaPlayer player,
@@ -126,14 +131,17 @@ public sealed class BrowserSession : IBrowserSession
         );
         var key = Guid.NewGuid();
         _subscribers[key] = channel;
-        Touch();
+        BeginStream();
 
-        // Yield current state immediately so subscribers always have a baseline.
-        yield return Current;
-
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, _disposeCts.Token);
         try
         {
+            // Yield current state immediately so subscribers always have a baseline.
+            yield return Current;
+
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(
+                ct,
+                _disposeCts.Token
+            );
             await foreach (var state in channel.Reader.ReadAllAsync(linked.Token))
             {
                 yield return state;
@@ -142,6 +150,7 @@ public sealed class BrowserSession : IBrowserSession
         finally
         {
             _subscribers.TryRemove(key, out _);
+            EndStream();
         }
     }
 
@@ -154,11 +163,21 @@ public sealed class BrowserSession : IBrowserSession
             throw new InvalidOperationException("Audio output is not configured for this session.");
         }
 
-        Touch();
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, _disposeCts.Token);
-        await foreach (var packet in _audio.StreamOpusAsync(linked.Token))
+        BeginStream();
+        try
         {
-            yield return packet;
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(
+                ct,
+                _disposeCts.Token
+            );
+            await foreach (var packet in _audio.StreamOpusAsync(linked.Token))
+            {
+                yield return packet;
+            }
+        }
+        finally
+        {
+            EndStream();
         }
     }
 
@@ -219,6 +238,20 @@ public sealed class BrowserSession : IBrowserSession
 
     private void Touch() =>
         Interlocked.Exchange(ref _lastActivityTicks, DateTimeOffset.UtcNow.UtcTicks);
+
+    private void BeginStream()
+    {
+        Interlocked.Increment(ref _activeStreams);
+        Touch();
+    }
+
+    // Touch on the way out so the idle timeout counts from when the last
+    // client detached, not from when it attached.
+    private void EndStream()
+    {
+        Touch();
+        Interlocked.Decrement(ref _activeStreams);
+    }
 
     private void Publish(SessionState state)
     {
