@@ -172,9 +172,10 @@ internal sealed class PulseAudioOutputDevice : IAudioOutputDevice
 
         try
         {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             var (_, stderr, exit) = await RunPactlAsync(
                 $"unload-module {_moduleId}",
-                CancellationToken.None
+                timeout.Token
             );
             if (exit != 0)
             {
