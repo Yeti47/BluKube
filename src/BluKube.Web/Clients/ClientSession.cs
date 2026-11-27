@@ -8,6 +8,8 @@ namespace BluKube.Web.Clients;
 
 public sealed class ClientSession(IConfigStore configStore) : IAsyncDisposable
 {
+    private static readonly TimeSpan CloseSessionTimeout = TimeSpan.FromSeconds(10);
+
     private CancellationTokenSource _cts = new();
 
     public event EventHandler<ClientStartupFailedEventArgs>? StartupFailed;
@@ -74,9 +76,13 @@ public sealed class ClientSession(IConfigStore configStore) : IAsyncDisposable
         var connection = Connection;
         if (connection?.SessionId is Guid sessionId)
         {
+            // Bounded so a slow server can't stall teardown before the hub
+            // connection below is disposed; a leaked connection keeps its
+            // session alive on the server and occupies a slot in the cap.
+            using var closeTimeout = new CancellationTokenSource(CloseSessionTimeout);
             try
             {
-                await connection.CloseSessionAsync(sessionId, CancellationToken.None);
+                await connection.CloseSessionAsync(sessionId, closeTimeout.Token);
             }
             catch { }
         }

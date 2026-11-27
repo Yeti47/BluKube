@@ -12,6 +12,8 @@ public sealed class BraveYouTubeBrowser(
     BraveProfileLease profile
 ) : IYouTubeBrowser
 {
+    private static readonly TimeSpan CloseTimeout = TimeSpan.FromSeconds(8);
+
     private readonly IPage _page = page;
     private bool _disposed;
 
@@ -37,7 +39,9 @@ public sealed class BraveYouTubeBrowser(
 
         try
         {
-            await context.CloseAsync();
+            // An unresponsive Brave can leave CloseAsync pending forever; the
+            // Playwright driver and profile still need cleaning up then.
+            await context.CloseAsync().WaitAsync(CloseTimeout);
         }
         catch { }
         playwright.Dispose();

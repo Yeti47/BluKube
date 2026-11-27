@@ -13,11 +13,20 @@ namespace BluKube.Server.Core.Domain;
 /// Owns a single isolated engine (Display + Browser) and one watch page
 /// at a time. Polls the watch page for position ticks while playing.
 /// </summary>
-public sealed class BraveMediaPlayer(IDisplay display, IYouTubeBrowser browser)
-    : IMediaPlayer,
-        IMediaSearch
+public sealed class BraveMediaPlayer(
+    IDisplay display,
+    IYouTubeBrowser browser,
+    TimeSpan? shutdownStepTimeout = null
+) : IMediaPlayer, IMediaSearch
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(500);
+
+    // Playwright's EvaluateAsync has no timeout of its own; a wedged YouTube
+    // tab would otherwise stall the poll loop (and everything awaiting it).
+    private static readonly TimeSpan PollReadTimeout = TimeSpan.FromSeconds(15);
+
+    private readonly TimeSpan _shutdownStepTimeout =
+        shutdownStepTimeout ?? TimeSpan.FromSeconds(10);
 
     private readonly CancellationTokenSource _disposeCts = new();
     private readonly ConcurrentDictionary<Guid, Channel<PlaybackEvent>> _subscribers = new();
@@ -240,9 +249,11 @@ public sealed class BraveMediaPlayer(IDisplay display, IYouTubeBrowser browser)
                     continue;
 
                 PlayerSnapshot snapshot;
+                using var readCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                readCts.CancelAfter(PollReadTimeout);
                 try
                 {
-                    var pageSnapshot = await watch.ReadStateAsync(ct);
+                    var pageSnapshot = await watch.ReadStateAsync(readCts.Token);
                     if (
                         !pageSnapshot.IsPlaying
                         && !pageSnapshot.IsEnded
@@ -254,9 +265,19 @@ public sealed class BraveMediaPlayer(IDisplay display, IYouTubeBrowser browser)
                     }
                     snapshot = pageSnapshot.ToPlayerSnapshot(_currentVideoId ?? string.Empty);
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
                 {
                     throw;
+                }
+                catch (OperationCanceledException)
+                {
+                    Publish(
+                        new PlaybackFailed(
+                            "polling_failed",
+                            $"The player page did not respond within {PollReadTimeout.TotalSeconds:0}s."
+                        )
+                    );
+                    return;
                 }
                 catch (Exception ex)
                 {
@@ -294,39 +315,59 @@ public sealed class BraveMediaPlayer(IDisplay display, IYouTubeBrowser browser)
         if (Interlocked.Exchange(ref _disposed, 1) == 1)
             return;
 
-        await _gate.WaitAsync();
+        // Cancel first so in-flight commands and the poll loop start unwinding.
+        // The poll CTS is linked to _disposeCts, so this cancels it too.
         try
         {
-            await StopPollingAsync();
-            try
-            {
-                _disposeCts.Cancel();
-            }
-            catch { }
+            _disposeCts.Cancel();
+        }
+        catch { }
 
-            foreach (var sub in _subscribers.Values)
-            {
-                sub.Writer.TryComplete();
-            }
-            _subscribers.Clear();
+        foreach (var sub in _subscribers.Values)
+        {
+            sub.Writer.TryComplete();
+        }
+        _subscribers.Clear();
 
-            try
-            {
-                await browser.DisposeAsync();
-            }
-            catch { }
-            try
-            {
-                await display.DisposeAsync();
-            }
-            catch { }
+        // A command stuck in a Playwright call holds the gate and ignores
+        // cancellation, so don't wait for it indefinitely.
+        var gateHeld = await _gate.WaitAsync(_shutdownStepTimeout);
+        try
+        {
+            // Tear down the browser before awaiting the poll loop: a poll that
+            // is stuck inside the page only returns once the page is gone.
+            // Killing the display afterwards takes Brave down with it even if
+            // closing the browser hung.
+            await RunBoundedAsync(() => browser.DisposeAsync().AsTask());
+            await RunBoundedAsync(() => display.DisposeAsync().AsTask());
 
-            _disposeCts.Dispose();
+            var pollTask = Interlocked.Exchange(ref _pollTask, null);
+            if (pollTask is not null)
+            {
+                await RunBoundedAsync(() => pollTask);
+            }
+            Interlocked.Exchange(ref _pollCts, null)?.Dispose();
         }
         finally
         {
-            _gate.Release();
-            _gate.Dispose();
+            if (gateHeld)
+            {
+                _gate.Release();
+                _gate.Dispose();
+                _disposeCts.Dispose();
+            }
+        }
+    }
+
+    private async Task RunBoundedAsync(Func<Task> step)
+    {
+        try
+        {
+            await step().WaitAsync(_shutdownStepTimeout);
+        }
+        catch
+        {
+            // Best-effort: shutdown continues with the next step regardless.
         }
     }
 }

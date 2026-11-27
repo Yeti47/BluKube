@@ -24,4 +24,11 @@ public sealed class SessionLimits
     /// How often the idle sweeper checks for expired sessions.
     /// </summary>
     public TimeSpan SweepInterval { get; set; } = TimeSpan.FromMinutes(1);
+
+    /// <summary>
+    /// How long closing a session may take before the manager stops waiting
+    /// for it. The session is already out of the cap by then; this only keeps
+    /// a stuck browser from blocking the sweeper or a hub call forever.
+    /// </summary>
+    public TimeSpan DisposeTimeout { get; set; } = TimeSpan.FromSeconds(30);
 }

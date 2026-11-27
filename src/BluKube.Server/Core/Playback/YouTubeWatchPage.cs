@@ -49,7 +49,9 @@ internal sealed class YouTubeWatchPage(IPage page, string videoId) : IWatchPage
 
     public async Task<WatchSnapshot> ReadStateAsync(CancellationToken ct)
     {
-        var raw = await ReadRawAsync();
+        // EvaluateAsync takes no token; WaitAsync makes the read abandonable
+        // so a hung page can't hold up the poll loop's shutdown.
+        var raw = await ReadRawAsync().WaitAsync(ct);
         return raw.ToSnapshot();
     }
 

@@ -128,10 +128,45 @@ public sealed class SessionManager : ISessionManager, IAsyncDisposable
     {
         if (_sessions.TryRemove(sessionId, out var session))
         {
-            await session.DisposeAsync();
+            await DisposeBoundedAsync(session);
             return true;
         }
         return false;
+    }
+
+    // A wedged browser must never block the caller (the idle sweeper or a hub
+    // call) indefinitely: one hung dispose used to stop the sweeper for good,
+    // so idle sessions piled up until the cap rejected every new client.
+    private async Task DisposeBoundedAsync(IBrowserSession session)
+    {
+        var dispose = session.DisposeAsync().AsTask();
+        try
+        {
+            await dispose.WaitAsync(_options.DisposeTimeout, _clock);
+        }
+        catch (TimeoutException)
+        {
+            _logger.LogWarning(
+                "Disposing session {SessionId} did not finish within {Timeout}; no longer waiting for it",
+                session.Id,
+                _options.DisposeTimeout
+            );
+            _ = dispose.ContinueWith(
+                t =>
+                    _logger.LogWarning(
+                        t.Exception,
+                        "Late dispose of session {SessionId} failed",
+                        session.Id
+                    ),
+                CancellationToken.None,
+                TaskContinuationOptions.OnlyOnFaulted,
+                TaskScheduler.Default
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to dispose session {SessionId}", session.Id);
+        }
     }
 
     public Task<IReadOnlyList<IBrowserSession>> ListSessionsAsync()
@@ -149,21 +184,26 @@ public sealed class SessionManager : ISessionManager, IAsyncDisposable
             while (!ct.IsCancellationRequested)
             {
                 await Task.Delay(_options.SweepInterval, _clock, ct);
-                await SweepOnceAsync();
+                try
+                {
+                    await SweepOnceAsync();
+                }
+                catch (Exception ex)
+                {
+                    // Keep sweeping: a dead sweeper silently fills the session cap.
+                    _logger.LogError(ex, "Idle session sweep failed");
+                }
             }
         }
         catch (OperationCanceledException)
         { /* dispose */
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Idle session sweeper crashed");
         }
     }
 
     private async Task SweepOnceAsync()
     {
         var cutoff = _clock.GetUtcNow() - _options.IdleTimeout;
+        var reaped = new List<IBrowserSession>();
         foreach (var (id, session) in _sessions)
         {
             if (session.LastActivityAt > cutoff)
@@ -176,16 +216,11 @@ public sealed class SessionManager : ISessionManager, IAsyncDisposable
                     id,
                     removed.LastActivityAt
                 );
-                try
-                {
-                    await removed.DisposeAsync();
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to dispose idle session {SessionId}", id);
-                }
+                reaped.Add(removed);
             }
         }
+
+        await Task.WhenAll(reaped.Select(DisposeBoundedAsync));
     }
 
     public async ValueTask DisposeAsync()
@@ -204,14 +239,7 @@ public sealed class SessionManager : ISessionManager, IAsyncDisposable
         var sessions = _sessions.Values.ToList();
         _sessions.Clear();
 
-        foreach (var session in sessions)
-        {
-            try
-            {
-                await session.DisposeAsync();
-            }
-            catch { }
-        }
+        await Task.WhenAll(sessions.Select(DisposeBoundedAsync));
 
         _disposeCts.Dispose();
     }
